@@ -11,9 +11,9 @@ line 1 of the 'inter' menu option consists of
 
 the buttons are as follows:
 
-  button up                - sends a power on signal
-  button down              - sends a power off signal
-  button #                 - enters config mode
+  button up    - sends a power on signal
+  button down  - sends a power off signal
+  button #     - enters config mode
 
 in config mode:
   button up    - sets the next higher value

@@ -17,8 +17,8 @@
 #define INTERTECHNO_CMD_OFF 0x06
 #define INTERTECHNO_DEF_FAMILY 12       // this translates as family 'L' on the rotary switch
 #define INTERTECHNO_DEF_DEVICE 7        // device number 7 on remotes that have devices numbered 1 to 16
-#define INTERTECHNO_SEQ_PKT   2         // how many packets to be sent with every sequence (1, 2, 3 or 4)
-#define INTERTECHNO_SEQ_SIZE  INTERTECHNO_SEQ_PKT*16        // 16, 32, 48 or 64 bytes to be allocated for the cmd sequence
+#define INTERTECHNO_SEQ_PKT   2         // how many packets to be sent with every sequence (1, 2 or 3)
+#define INTERTECHNO_SEQ_SIZE  INTERTECHNO_SEQ_PKT*16        // 16, 32 or 48 bytes to be allocated for the cmd sequence
 
 #define st(x)                       do { x } while (__LINE__ == -1)
 #define ENTER_CRITICAL_SECTION(x)   st( x = __get_interrupt_state(); __disable_interrupt(); )
@@ -158,7 +158,6 @@ void rf_init(void)
         //WriteSingleReg(MCSM2, 0x07);        //Main Radio Control State Machine Configuration
         //WriteSingleReg(MCSM1, 0x30);        //Main Radio Control State Machine Configuration
         WriteSingleReg(MCSM0, 0x00);      //Main Radio Control State Machine Configuration
-        //WriteSingleReg(MCSM0, 0x10);    //Main Radio Control State Machine Configuration
         WriteSingleReg(FOCCFG, 0x76);   //Frequency Offset Compensation Configuration
         //WriteSingleReg(BSCFG, 0x6C);        //Bit Synchronization Configuration
         //WriteSingleReg(AGCCTRL2, 0x03);     //AGC Control
