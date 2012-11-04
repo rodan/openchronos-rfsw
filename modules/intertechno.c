@@ -7,14 +7,40 @@
 //
 // Based on a nice tutorial by Christian M. Schmid
 // http://blog.chschmid.com/?page_id=193
+//
+// Usage:
+//
+// Line1 contains FF.DD
+//
+// FF is the decimal notation of the family in which the device is placed [1-16]
+//                  A is 01, B is 02 ... P is 16.
+//                  this option must be used for doorbell/PIR device selection
+// DD is the decimal notation of the device number [1-16]
+//                  on some factory remotes devices are placed in 4 groups,
+//                  in this case device 2 from group 3 is device number 10.
+//                  special devices like doorbell/PIRs must be set as device number 8.
+//
+// Line2 becomes 'on', 'off', 'spe' depending on what command was sent last
+//
+// radio glyphs come up when the command is sent.
+//
+// buttons:
+//
+// up      - send an 'on' command on the current device
+// down    - send an 'off' command
+// up+down - send a special command (for doorbells/PIRs), make sure DD is 8 in this case.
+// #       - enter config mode. use up, down, # to select family and device, * to save.
+//
+
 
 #include <openchronos.h>
 #include <drivers/display.h>
 #include <drivers/timer.h>
 #include <drivers/rf1a.h>
 
-#define INTERTECHNO_CMD_ON  0x07
-#define INTERTECHNO_CMD_OFF 0x06
+#define INTERTECHNO_CMD_ON  0x7         // command for turning devices on
+#define INTERTECHNO_CMD_OFF 0x6         // command for turning devices off
+#define INTERTECHNO_CMD_SP  0xf         // special devices like doorbells, PIR detectors use this cmd
 #define INTERTECHNO_DEF_FAMILY 12       // this translates as family 'L' on the rotary switch
 #define INTERTECHNO_DEF_DEVICE 7        // device number 7 on remotes that have devices numbered 1 to 16
 #define INTERTECHNO_SEQ_PKT   2         // how many packets to be sent with every sequence (1, 2 or 3)
@@ -58,34 +84,40 @@ static void intertechno_down_pressed()
         display_chars(0, LCD_SEG_L2_2_0, "OFF", SEG_SET);
 }
 
+static void intertechno_updown_pressed()
+{
+        rf_tx_cmd(((it_family - 1) << 4) + it_device - 1, INTERTECHNO_CMD_SP);
+        display_chars(0, LCD_SEG_L2_2_0, "SPE", SEG_SET);
+}
+
 /*************************** edit mode callbacks **************************/
-static void edit_ff_sel(void)
+static void it_edit_ff_sel(void)
 {
         display_chars(0, LCD_SEG_L1_3_2, NULL, BLINK_ON);
 }
 
-static void edit_ff_dsel(void)
+static void it_edit_ff_dsel(void)
 {
         display_chars(0, LCD_SEG_L1_3_2, NULL, BLINK_OFF);
 }
 
-static void edit_ff_set(int8_t step)
+static void it_edit_ff_set(int8_t step)
 {
         helpers_loop(&tmp_family, 1, 16, step);
         _printf(0, LCD_SEG_L1_3_2, "%02u", tmp_family);
 }
 
-static void edit_dd_sel(void)
+static void it_edit_dd_sel(void)
 {
         display_chars(0, LCD_SEG_L1_1_0, NULL, BLINK_ON);
 }
 
-static void edit_dd_dsel(void)
+static void it_edit_dd_dsel(void)
 {
         display_chars(0, LCD_SEG_L1_1_0, NULL, BLINK_OFF);
 }
 
-static void edit_dd_set(int8_t step)
+static void it_edit_dd_set(int8_t step)
 {
         helpers_loop(&tmp_device, 1, 16, step);
         _printf(0, LCD_SEG_L1_1_0, "%02u", tmp_device);
@@ -99,8 +131,8 @@ static void intertechno_save(void)
 
 /* edit mode item table */
 static struct menu_editmode_item intertechno_items[] = {
-        {&edit_dd_sel, &edit_dd_dsel, &edit_dd_set},
-        {&edit_ff_sel, &edit_ff_dsel, &edit_ff_set},
+        {&it_edit_dd_sel, &it_edit_dd_dsel, &it_edit_dd_set},
+        {&it_edit_ff_sel, &it_edit_ff_dsel, &it_edit_ff_set},
         {NULL}
 };
 
@@ -116,7 +148,7 @@ void mod_intertechno_init()
                        &intertechno_down_pressed,
                        &intertechno_num_pressed,
                        NULL,
-                       NULL, NULL,
+                       NULL, &intertechno_updown_pressed,
                        &intertechno_activated, &intertechno_deactivated);
 }
 

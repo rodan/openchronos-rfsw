@@ -3,6 +3,7 @@
 void mod_init(void)
 {
 	mod_clock_init();
+	mod_alarm_init();
 	mod_battery_init();
 	mod_rfbsl_init();
 	mod_intertechno_init();
