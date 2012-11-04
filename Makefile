@@ -3,6 +3,7 @@ SUBDIRS = drivers modules
 include Common.mk
 
 PYTHON := $(shell which python2 || which python)
+BASH := $(shell which bash || which bash)
 
 .PHONY: all
 .PHONY: clean
@@ -82,7 +83,7 @@ config.h:
 	@echo "Please do a 'make config' first!" && false
 
 new_timestamps:
-	@ ./tools/update_rtca_now.sh
+	@$(BASH) ./tools/update_rtca_now.sh
 
 config:
 	$(PYTHON) tools/config.py
