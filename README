@@ -1,28 +1,38 @@
 
 fork of the openchronos-ng that implements interfacing with intertechno radio switches
 
-line 1 of the 'inter' menu option consists of
+ Author:          Petre Rodan <petre.rodan@simplex.ro>
+ Available from:  https://github.com/rodan/openchronos-rfsw
+ License:         GNU GPLv3
 
-    FF.DD
+ Based on a nice tutorial by Christian M. Schmid
+ http://blog.chschmid.com/?page_id=193
 
-    where
-        FF - family [1-16]
-        DD - device [1-16]
+ Usage:
 
-the buttons are as follows:
+ Line1 contains FF.DD
 
-  button up    - sends a power on signal
-  button down  - sends a power off signal
-  button #     - enters config mode
+ FF is the decimal notation of the family in which the device is placed [1-16]
+                  A is 01, B is 02 ... P is 16.
+                  this option must be used for doorbell/PIR device selection
+ DD is the decimal notation of the device number [1-16]
+                  on some factory remotes devices are placed in 4 groups,
+                  in this case device 2 from group 3 is device number 10.
+                  special devices like doorbell/PIRs must be set as device number 8.
 
-in config mode:
-  button up    - sets the next higher value
-  button down  - sets the next lower value
-  button *     - saves and exits config mode
-  button #     - cycles between family and device
+ Line2 becomes 'on', 'off', 'spe' depending on what command was sent last
+
+ radio glyphs come up when the command is sent.
+
+ buttons:
+
+ up      - send an 'on' command on the current device
+ down    - send an 'off' command
+ up+down - send a special command (for doorbells/PIRs), make sure DD is 8 in this case.
+ #       - enter config mode. use up, down, # to select family and device, * to save.
 
 forked on the 30th Oct 2012 from
-openchronos-ng - http://openchronos.sourceforge.net/
+openchronos-ng - http://openchronos-ng.sourceforge.net/
 
 == Status ==
 In progress..
