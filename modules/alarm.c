@@ -24,7 +24,6 @@
 /* driver */
 #include <drivers/display.h>
 #include <drivers/rtca.h>
-#include <drivers/buzzer.h>
 
 static union {
 	struct {
@@ -36,80 +35,73 @@ static union {
 	uint8_t state:2;
 } alarm_state;
 
-static uint8_t alarm_tmp_hh, alarm_tmp_mm;
+static uint8_t tmp_hh, tmp_mm;
 
 static void refresh_screen()
 {
-	rtca_get_alarm(&alarm_tmp_hh, &alarm_tmp_mm);
+	rtca_get_alarm(&tmp_hh, &tmp_mm);
 
-	_printf(0, LCD_SEG_L1_1_0, "%02u", alarm_tmp_mm);
-	_printf(0, LCD_SEG_L1_3_2, "%02u", alarm_tmp_hh);
+	_printf(0, LCD_SEG_L1_1_0, "%02u", tmp_mm);
+	_printf(0, LCD_SEG_L1_3_2, "%02u", tmp_hh);
 }
 
 static void alarm_event(enum sys_message msg)
 {
-    note welcome[4] = {0x1901, 0x1904, 0x1908, 0x000F};
-    buzzer_play(welcome);
+	/* TODO: */
 }
 
 /*************************** edit mode callbacks **************************/
-static void alarm_edit_hh_sel(void)
+static void edit_hh_sel(void)
 {
 	display_chars(0, LCD_SEG_L1_3_2, NULL, BLINK_ON);
 }
 
-static void alarm_edit_hh_dsel(void)
+static void edit_hh_dsel(void)
 {
 	display_chars(0, LCD_SEG_L1_3_2, NULL, BLINK_OFF);
 }
 
-static void alarm_edit_hh_set(int8_t step)
+static void edit_hh_set(int8_t step)
 {
 	/* TODO: fix for 12/24 hr! */
-	helpers_loop(&alarm_tmp_hh, 0, 23, step);
-	_printf(0, LCD_SEG_L1_3_2, "%02u", alarm_tmp_hh);
+	helpers_loop(&tmp_hh, 0, 23, step);
+	_printf(0, LCD_SEG_L1_3_2, "%02u", tmp_hh);
 }
 
-static void alarm_edit_mm_sel(void)
+static void edit_mm_sel(void)
 {
 	display_chars(0, LCD_SEG_L1_1_0, NULL, BLINK_ON);
 }
 
-static void alarm_edit_mm_dsel(void)
+static void edit_mm_dsel(void)
 {
 	display_chars(0, LCD_SEG_L1_1_0, NULL, BLINK_OFF);
 }
 
-static void alarm_edit_mm_set(int8_t step)
+static void edit_mm_set(int8_t step)
 {
-	helpers_loop(&alarm_tmp_mm, 0, 59, step);
-	_printf(0, LCD_SEG_L1_1_0, "%02u", alarm_tmp_mm);
+	helpers_loop(&tmp_mm, 0, 59, step);
+	_printf(0, LCD_SEG_L1_1_0, "%02u", tmp_mm);
 }
 
-static void alarm_edit_save(void)
+static void edit_save(void)
 {
 	/* Here we return from the edit mode, fill in the new values! */
-	rtca_set_alarm(alarm_tmp_hh, alarm_tmp_mm);
+	rtca_set_alarm(tmp_hh, tmp_mm);
 }
 
 /* edit mode item table */
-static struct menu_editmode_item alarm_edit_items[] = {
-	{&alarm_edit_mm_sel, &alarm_edit_mm_dsel, &alarm_edit_mm_set},
-	{&alarm_edit_hh_sel, &alarm_edit_hh_dsel, &alarm_edit_hh_set},
+static struct menu_editmode_item edit_items[] = {
+	{&edit_hh_sel, &edit_hh_dsel, &edit_hh_set},
+	{&edit_mm_sel, &edit_mm_dsel, &edit_mm_set},
 	{ NULL },
 };
 
 /******************** menu callbacks **************************************/
 static void alarm_activated()
 {
-	if (alarm_state.alarm)
-		display_symbol(0, LCD_ICON_ALARM, SEG_ON);
-	if (alarm_state.chime) {
-		display_symbol(0, LCD_ICON_BEEPER2, SEG_ON);
-		display_symbol(0, LCD_ICON_BEEPER3, SEG_ON);
-    }
-    display_symbol(0, LCD_SEG_L1_COL, SEG_ON);
 	/* Force redraw of the screen */
+	display_symbol(0, LCD_SEG_L1_COL, SEG_ON);
 	refresh_screen();
 }
 
@@ -118,14 +110,11 @@ static void alarm_deactivated()
 {
 	/* clean up screen */
 	display_clear(0, 1);
-    display_symbol(0, LCD_ICON_ALARM, SEG_OFF);
-    display_symbol(0, LCD_ICON_BEEPER2, SEG_OFF);
-	display_symbol(0, LCD_ICON_BEEPER3, SEG_OFF);
 }
 
 
 /* NUM (#) button pressed callback */
-static void alarm_num_pressed()
+static void num_pressed()
 {
 	/* this cycles between all alarm/chime combinations and overflow */
 	alarm_state.state++;
@@ -156,20 +145,20 @@ static void alarm_num_pressed()
 
 
 /* Star button long press callback. */
-static void alarm_star_long_pressed()
+static void star_long_pressed()
 {
 	/* Save the current time in edit_buffer */
-	rtca_get_alarm(&alarm_tmp_hh, &alarm_tmp_mm);
+	rtca_get_alarm(&tmp_hh, &tmp_mm);
 
-	menu_editmode_start(&alarm_edit_save, alarm_edit_items);
+	menu_editmode_start(&edit_save, edit_items);
 }
 
 
 void mod_alarm_init()
 {
 	menu_add_entry("ALARM", NULL, NULL,
-			&alarm_num_pressed,
-			&alarm_star_long_pressed,
+			&num_pressed,
+			&star_long_pressed,
 			NULL, NULL,
 			&alarm_activated,
 			&alarm_deactivated);
