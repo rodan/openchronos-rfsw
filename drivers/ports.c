@@ -102,9 +102,13 @@ void PORT2_ISR(void)
 #endif
 
 		/* check how long btn was pressed and save the event */
-		if (pressed_ticks > CONFIG_BUTTONS_LONG_PRESS_TIME)
-			ports_pressed_btns |= buttons << 5;
-		else if (pressed_ticks >= CONFIG_BUTTONS_SHORT_PRESS_TIME)
+		if (pressed_ticks > CONFIG_BUTTONS_LONG_PRESS_TIME) {
+			/* if long_up or long_down has been pressed, consider the short version */
+			if (buttons & (BIT0 | BIT4))
+				ports_pressed_btns |= buttons;
+			else
+				ports_pressed_btns |= buttons << 5;
+		} else if (pressed_ticks >= CONFIG_BUTTONS_SHORT_PRESS_TIME)
 			ports_pressed_btns |= buttons;
 
 		/* set buttons IRQ triggers to rising edge */
