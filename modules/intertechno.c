@@ -214,18 +214,20 @@ void rf_tx_cmd(uint8_t prefix, uint8_t cmd)
     // replace 1 with 0x8e and 0 with 0x88
     for (i = 7; i >= 0; i--) {
         if (rprefix & (1 << i)) {
-            it_buff[p++] = 0x8e;
+            it_buff[p] = 0x8e;
         } else {
-            it_buff[p++] = 0x88;
+            it_buff[p] = 0x88;
         }
+        p++;
     }
 
     for (i = 3; i >= 0; i--) {
         if (cmd & (1 << i)) {
-            it_buff[p++] = 0x8e;
+            it_buff[p] = 0x8e;
         } else {
-            it_buff[p++] = 0x88;
+            it_buff[p] = 0x88;
         }
+        p++;
     }
 
     // sync sequence
