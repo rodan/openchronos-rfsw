@@ -245,10 +245,6 @@ void rf_tx_cmd(uint8_t prefix, uint8_t cmd)
 
     // factory remotes send the sequence 4 times
     for (i = 0; i < 4; i++) {
-        // voodoo
-        //RF1AIES |= BIT9;
-        //RF1AIFG &= ~BIT9;       // Clear pending interrupts
-        //RF1AIE &= ~BIT9;        // Disable TX end-of-packet interrupt
 
         WriteBurstReg(RF_TXFIFOWR, it_buff, INTERTECHNO_SEQ_SIZE);      // fill up FIFO
         Strobe(RF_STX);         // TX
@@ -256,7 +252,7 @@ void rf_tx_cmd(uint8_t prefix, uint8_t cmd)
 
         // for unknown reasons in 90% of cases during the _last_ cycle TXFIFOWR gets filled
         // but STX doesn't send it
-        // TXFIFO either remains filled forever, until RF_SFTX, or RF_STX - whichever is first
+        // TXFIFO either remains filled forever, until RF_SFTX, or until RF_STX - whichever is first
         // temporary fix
         if (ReadSingleReg(TXBYTES)) {
             Strobe(RF_STX);
