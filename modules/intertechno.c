@@ -155,7 +155,7 @@ void mod_intertechno_init()
 
 void rf_init(void)
 {
-    uint8_t PATable[2] = { 0x00, 0xC3 };        //0 dBm
+    uint8_t PATable[2] = { 0x00, 0xC3 };    // logic 0 and logic 1 power levels for OOK modulation
 
     ResetRadioCore();
 
@@ -204,7 +204,7 @@ uint8_t rotate_byte(uint8_t in)
 
 void rf_tx_cmd(uint8_t prefix, uint8_t cmd)
 {
-    uint8_t ib = 0;
+    uint8_t p = 0;
     uint8_t rprefix;
     uint8_t it_buff[INTERTECHNO_SEQ_SIZE];
     int8_t i;
@@ -214,27 +214,25 @@ void rf_tx_cmd(uint8_t prefix, uint8_t cmd)
     // replace 1 with 0x8e and 0 with 0x88
     for (i = 7; i >= 0; i--) {
         if (rprefix & (1 << i)) {
-            it_buff[ib] = 0x8e;
+            it_buff[p++] = 0x8e;
         } else {
-            it_buff[ib] = 0x88;
+            it_buff[p++] = 0x88;
         }
-        ib++;
     }
 
     for (i = 3; i >= 0; i--) {
         if (cmd & (1 << i)) {
-            it_buff[ib] = 0x8e;
+            it_buff[p++] = 0x8e;
         } else {
-            it_buff[ib] = 0x88;
+            it_buff[p++] = 0x88;
         }
-        ib++;
     }
 
     // sync sequence
-    it_buff[ib] = 0x80;
-    it_buff[ib + 1] = 0;
-    it_buff[ib + 2] = 0;
-    it_buff[ib + 3] = 0;
+    it_buff[p++] = 0x80;
+    it_buff[p++] = 0;
+    it_buff[p++] = 0;
+    it_buff[p++] = 0;
 
     // display RF symbol
     display_symbol(0, LCD_ICON_BEEPER1, SEG_ON);
@@ -279,19 +277,22 @@ void rf_tx_cmd(uint8_t prefix, uint8_t cmd)
 
 }
 
-// *************************************************************************************************
-// @fn          WriteBurstPATable
-// @brief       Write to multiple locations in power table. also dragons
+// FIXME should be moved to drivers/rf1a.c
+// function taken from the RF1A lib available at http://www.ti.com/lit/zip/slaa460
+// *****************************************************************************
+// @fn          WritePATable
+// @brief       Write to multiple locations in power table 
 // @param       unsigned char *buffer   Pointer to the table of values to be written 
 // @param       unsigned char count     Number of values to be written
 // @return      none
-// *************************************************************************************************
+// *****************************************************************************
 void WriteBurstPATable(unsigned char *buffer, unsigned char count)
 {
     volatile char i = 0;
     uint16_t int_state;
 
     ENTER_CRITICAL_SECTION(int_state);
+
     while (!(RF1AIFCTL1 & RFINSTRIFG)) ;
     RF1AINSTRW = 0x7E00 + buffer[i];    // PA Table burst write   
 
