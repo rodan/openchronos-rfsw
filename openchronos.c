@@ -75,6 +75,7 @@
 #include <drivers/rtca.h>
 #include <drivers/temperature.h>
 #include <drivers/battery.h>
+#include <drivers/radio.h>
 
 #define BIT_IS_SET(F, B)  ((F) | (B)) == (F)
 
@@ -189,6 +190,12 @@ void check_events(void)
 		battery_measurement();
 	}
 #endif
+
+	/* drivers/radio */
+	if(radio_last_event){
+		msg |= SYS_MSG_RADIO;
+		radio_last_event = 0;
+	}
 
 	{
 		struct sys_messagebus *p = messagebus;

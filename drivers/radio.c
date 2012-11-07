@@ -39,6 +39,7 @@
 #include <openchronos.h>
 
 // driver
+#include "radio.h"
 #include "rf1a.h"
 
 // *************************************************************************************************
@@ -171,8 +172,11 @@ void radio_ISR(void)
 	/*if (is_rf()) {
 		MRFI_RadioIsr();
 	} else {*/
-		if (rf1aivec == RF1AIV_NONE) { // RF1A interface interrupt (error etc.)
-			asm("	nop"); // break here
-		}
+	if (rf1aivec == RF1AIV_RFIFG9) { // end of packet
+		RF1AIE &= ~BIT9;      // Disable TX end-of-packet interrupt
+		radio_last_event = RADIO_EV_EOP;
+	} else if (rf1aivec == RF1AIV_NONE) { // RF1A interface interrupt (error etc.)
+		asm("	nop"); // break here
+	}
 	/*}*/
 }

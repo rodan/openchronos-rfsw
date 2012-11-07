@@ -45,4 +45,11 @@ extern void close_radio(void);
 extern void pmm_set_high_current_mode(void);
 extern void pmm_set_low_current_mode(void);
 
+enum radio_tevent {
+	RADIO_EV_EOP	= BIT0, // end of packet
+};
+
+/* exclusive use by openchronos system */
+volatile enum radio_tevent radio_last_event;
+
 #endif /*RADIO_H_*/
