@@ -46,7 +46,7 @@ extern void pmm_set_high_current_mode(void);
 extern void pmm_set_low_current_mode(void);
 
 enum radio_tevent {
-	RADIO_EV_EOP	= BIT0, // end of packet
+	RADIO_EV_RFIFG9	= BIT0, // end of packet
 };
 
 /* exclusive use by openchronos system */
