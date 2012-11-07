@@ -51,9 +51,10 @@
 #define ENTER_CRITICAL_SECTION(x)   st( x = __get_interrupt_state(); __disable_interrupt(); )
 #define EXIT_CRITICAL_SECTION(x)    __set_interrupt_state(x)
 
-void rf_init(void);
+void it_rf_init(void);
 uint8_t rotate_byte(uint8_t in);
-void rf_tx_cmd(uint8_t prefix, uint8_t cmd);
+void it_tx_cmd(uint8_t prefix, uint8_t cmd);
+static void it_tx_end(enum sys_message msg);
 void WriteBurstPATable(unsigned char *buffer, unsigned char count);
 
 uint8_t it_family = INTERTECHNO_DEF_FAMILY;
@@ -63,6 +64,7 @@ uint8_t tmp_device = INTERTECHNO_DEF_DEVICE;
 
 static void intertechno_activated()
 {
+    sys_messagebus_register(&it_tx_end, SYS_MSG_RADIO);
     _printf(0, LCD_SEG_L1_3_2, "%02u", it_family);
     _printf(0, LCD_SEG_L1_1_0, "%02u", it_device);
     display_symbol(0, LCD_SEG_L1_DP1, SEG_ON);
@@ -70,24 +72,25 @@ static void intertechno_activated()
 
 static void intertechno_deactivated()
 {
+    sys_messagebus_unregister(&it_tx_end);
     display_clear(0, 1);
 }
 
 static void intertechno_up_pressed()
 {
-    rf_tx_cmd(((it_family - 1) << 4) + it_device - 1, INTERTECHNO_CMD_ON);
+    it_tx_cmd(((it_family - 1) << 4) + it_device - 1, INTERTECHNO_CMD_ON);
     display_chars(0, LCD_SEG_L2_2_0, "ON ", SEG_SET);
 }
 
 static void intertechno_down_pressed()
 {
-    rf_tx_cmd(((it_family - 1) << 4) + it_device - 1, INTERTECHNO_CMD_OFF);
+    it_tx_cmd(((it_family - 1) << 4) + it_device - 1, INTERTECHNO_CMD_OFF);
     display_chars(0, LCD_SEG_L2_2_0, "OFF", SEG_SET);
 }
 
 static void intertechno_updown_pressed()
 {
-    rf_tx_cmd(((it_family - 1) << 4) + it_device - 1, INTERTECHNO_CMD_SP);
+    it_tx_cmd(((it_family - 1) << 4) + it_device - 1, INTERTECHNO_CMD_SP);
     display_chars(0, LCD_SEG_L2_2_0, "SPE", SEG_SET);
 }
 
@@ -153,22 +156,15 @@ void mod_intertechno_init()
                    &intertechno_activated, &intertechno_deactivated);
 }
 
-void rf_init(void)
+void it_rf_init(void)
 {
     uint8_t PATable[2] = { 0x00, 0xC3 };    // logic 0 and logic 1 power levels for OOK modulation
 
     ResetRadioCore();
 
-    // open PMM module registers for write access
-    PMMCTL0_H = 0xA5;
-    // global high power module request enable
-    PMMCTL0_L |= PMMHPMRE;
-    // lock PMM module registers for write access
-    PMMCTL0_H = 0x00;
-
     // minimal register changes
     WriteSingleReg(IOCFG0, 0x06);       //GDO0 Output Configuration
-    WriteSingleReg(PKTLEN, INTERTECHNO_SEQ_SIZE);       //Packet Length
+    WriteSingleReg(PKTLEN, INTERTECHNO_SEQ_SIZE*4);       //Packet Length
     WriteSingleReg(PKTCTRL0, 0x00);     //Packet Automation Control
     WriteSingleReg(FREQ2, 0x10);        //Frequency Control Word, High Byte
     WriteSingleReg(FREQ1, 0xB0);        //Frequency Control Word, Middle Byte
@@ -203,7 +199,7 @@ uint8_t rotate_byte(uint8_t in)
     return rv;
 }
 
-void rf_tx_cmd(uint8_t prefix, uint8_t cmd)
+void it_tx_cmd(uint8_t prefix, uint8_t cmd)
 {
     uint8_t p = 0;
     uint8_t rprefix;
@@ -242,29 +238,25 @@ void rf_tx_cmd(uint8_t prefix, uint8_t cmd)
     display_symbol(0, LCD_ICON_BEEPER2, SEG_ON);
     display_symbol(0, LCD_ICON_BEEPER3, SEG_ON);
 
-    rf_init();
+    it_rf_init();
 
     Strobe(RF_SCAL);            // re-calibrate radio
 
-    // factory remotes send the sequence 4 times
+    // set an interrupt to trigger when the packet is fully sent
+    RF1AIES |= BIT9;
+    RF1AIFG &= ~BIT9;           // Clear pending interrupts
+    RF1AIE |= BIT9;             // Enable TX end-of-packet interrupt
+
+    // factory remotes send the command sequence 4 times
     for (i = 0; i < 4; i++) {
-
         WriteBurstReg(RF_TXFIFOWR, it_buff, INTERTECHNO_SEQ_SIZE);
-        Strobe(RF_STX);
-        timer0_delay(60, LPM3_bits);    // each sequence should take at least 54.6 ms
-
-        // for unknown reasons the first execution of STX does nothing
-        // in the last cycle TXFIFO will contain 16bytes of data unsent.
-        // these bytes either remain in the FIFO forever, until RF_SFTX, or until RF_STX - whichever is first
-        // temporary fix
-        if (ReadSingleReg(TXBYTES)) {
-            Strobe(RF_STX);
-            timer0_delay(60, LPM3_bits);
-        }
-
-        while ((Strobe(RF_SNOP) & 0xF0) != 0) ; // wait until radio core ready and IDLE state
     }
+    Strobe(RF_STX);             // transmit
 
+}
+
+static void it_tx_end(enum sys_message msg)
+{
     Strobe(RF_SIDLE);           // IDLE
     Strobe(RF_SFTX);            // flush TXFIFO
     Strobe(RF_SPWD);            // power-down mode
@@ -273,6 +265,4 @@ void rf_tx_cmd(uint8_t prefix, uint8_t cmd)
     display_symbol(0, LCD_ICON_BEEPER1, SEG_OFF);
     display_symbol(0, LCD_ICON_BEEPER2, SEG_OFF);
     display_symbol(0, LCD_ICON_BEEPER3, SEG_OFF);
-
 }
-
