@@ -177,13 +177,14 @@ void rf_init(void)
     WriteSingleReg(MDMCFG3, 0x70);      //Modem Configuration
     WriteSingleReg(MDMCFG2, 0x30);      //Modem Configuration
     WriteSingleReg(MDMCFG1, 0x02);      //Modem Configuration
-    WriteSingleReg(MCSM0, 0x00);        //Main Radio Control State Machine Configuration
     WriteSingleReg(MCSM1, 0x00);        //Main Radio Control State Machine Configuration
+    WriteSingleReg(MCSM0, 0x00);        //Main Radio Control State Machine Configuration
     WriteSingleReg(FOCCFG, 0x76);       //Frequency Offset Compensation Configuration
     WriteSingleReg(WOREVT1, 0x87);      //High Byte Event0 Timeout
     WriteSingleReg(WOREVT0, 0x6B);      //Low Byte Event0 Timeout
     WriteSingleReg(WORCTRL, 0xF8);      //Wake On Radio Control
     WriteSingleReg(FREND0, 0x11);       //Front End TX Configuration
+    WriteSingleReg(TEST0, 0x09);        //Various Test Settings
 
     WriteBurstPATable(&PATable[0], 2);
 }
@@ -248,13 +249,13 @@ void rf_tx_cmd(uint8_t prefix, uint8_t cmd)
     // factory remotes send the sequence 4 times
     for (i = 0; i < 4; i++) {
 
-        WriteBurstReg(RF_TXFIFOWR, it_buff, INTERTECHNO_SEQ_SIZE);      // fill up FIFO
-        Strobe(RF_STX);         // TX
+        WriteBurstReg(RF_TXFIFOWR, it_buff, INTERTECHNO_SEQ_SIZE);
+        Strobe(RF_STX);
         timer0_delay(60, LPM3_bits);    // each sequence should take at least 54.6 ms
 
-        // for unknown reasons in 90% of cases during the _last_ cycle TXFIFOWR gets filled
-        // but STX doesn't send it
-        // TXFIFO either remains filled forever, until RF_SFTX, or until RF_STX - whichever is first
+        // for unknown reasons the first execution of STX does nothing
+        // in the last cycle TXFIFO will contain 16bytes of data unsent.
+        // these bytes either remain in the FIFO forever, until RF_SFTX, or until RF_STX - whichever is first
         // temporary fix
         if (ReadSingleReg(TXBYTES)) {
             Strobe(RF_STX);
