@@ -247,4 +247,31 @@ void WritePATable(unsigned char value)
 	EXIT_CRITICAL_SECTION(int_state);
 }
 
+// *****************************************************************************
+// @fn          WritePATable
+// @brief       Write to multiple locations in power table 
+// @param       unsigned char *buffer   Pointer to the table of values to be written 
+// @param       unsigned char count     Number of values to be written
+// @return      none
+// *****************************************************************************
+void WriteBurstPATable(unsigned char *buffer, unsigned char count)
+{
+	volatile char i = 0;
+	uint16_t int_state;
 
+	ENTER_CRITICAL_SECTION(int_state);
+
+	while (!(RF1AIFCTL1 & RFINSTRIFG)) ;
+	RF1AINSTRW = 0x7E00 + buffer[i];    // PA Table burst write   
+
+	for (i = 1; i < count; i++) {
+		RF1ADINB = buffer[i];   // Send data
+		while (!(RFDINIFG & RF1AIFCTL1)) ;      // Wait for TX to finish
+	}
+	i = RF1ADOUTB;              // Reset RFDOUTIFG flag which contains status byte
+
+	while (!(RF1AIFCTL1 & RFINSTRIFG)) ;
+	RF1AINSTRB = RF_SNOP;       // reset PA Table pointer
+
+	EXIT_CRITICAL_SECTION(int_state);
+}
