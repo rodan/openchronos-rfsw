@@ -40,27 +40,21 @@
 #define INTERTECHNO_CMD_ON  0x07        // command for turning switches on
 #define INTERTECHNO_CMD_OFF 0x06        // command for turning switches off
 #define INTERTECHNO_CMD_SP  0x0f        // special devices like doorbells, PIR detectors use this cmd
-#define INTERTECHNO_SEQ_SIZE  16        // TX FIFO size to be allocated
+#define INTERTECHNO_SEQ_SIZE  16        // sequence buffer size to be allocated
 
 // starting values
 #define INTERTECHNO_DEF_FAMILY 12       // this translates as family 'L' on the rotary switch
 #define INTERTECHNO_DEF_DEVICE 7        // device number 7 on remotes that have devices numbered 1 to 16
                                         // or device 3 group 2 on others
-
-#define st(x)                       do { x } while (__LINE__ == -1)
-#define ENTER_CRITICAL_SECTION(x)   st( x = __get_interrupt_state(); __disable_interrupt(); )
-#define EXIT_CRITICAL_SECTION(x)    __set_interrupt_state(x)
-
-void it_rf_init(void);
 uint8_t rotate_byte(uint8_t in);
+void it_rf_init(void);
 void it_tx_cmd(uint8_t prefix, uint8_t cmd);
 static void it_tx_end(enum sys_message msg);
-void WriteBurstPATable(unsigned char *buffer, unsigned char count);
 
 uint8_t it_family = INTERTECHNO_DEF_FAMILY;
 uint8_t it_device = INTERTECHNO_DEF_DEVICE;
-uint8_t tmp_family = INTERTECHNO_DEF_FAMILY;
-uint8_t tmp_device = INTERTECHNO_DEF_DEVICE;
+uint8_t it_tmp_family = INTERTECHNO_DEF_FAMILY;
+uint8_t it_tmp_device = INTERTECHNO_DEF_DEVICE;
 
 static void intertechno_activated()
 {
@@ -107,8 +101,8 @@ static void it_edit_ff_dsel(void)
 
 static void it_edit_ff_set(int8_t step)
 {
-    helpers_loop(&tmp_family, 1, 16, step);
-    _printf(0, LCD_SEG_L1_3_2, "%02u", tmp_family);
+    helpers_loop(&it_tmp_family, 1, 16, step);
+    _printf(0, LCD_SEG_L1_3_2, "%02u", it_tmp_family);
 }
 
 static void it_edit_dd_sel(void)
@@ -123,14 +117,14 @@ static void it_edit_dd_dsel(void)
 
 static void it_edit_dd_set(int8_t step)
 {
-    helpers_loop(&tmp_device, 1, 16, step);
-    _printf(0, LCD_SEG_L1_1_0, "%02u", tmp_device);
+    helpers_loop(&it_tmp_device, 1, 16, step);
+    _printf(0, LCD_SEG_L1_1_0, "%02u", it_tmp_device);
 }
 
 static void intertechno_save(void)
 {
-    it_family = tmp_family;
-    it_device = tmp_device;
+    it_family = it_tmp_family;
+    it_device = it_tmp_device;
 }
 
 /* edit mode item table */
@@ -231,7 +225,7 @@ void it_tx_cmd(uint8_t prefix, uint8_t cmd)
     it_buff[p++] = 0x80;
     it_buff[p++] = 0;
     it_buff[p++] = 0;
-    it_buff[p++] = 0;
+    it_buff[p] = 0;
 
     // display RF symbol
     display_symbol(0, LCD_ICON_BEEPER1, SEG_ON);
