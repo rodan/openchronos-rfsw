@@ -1,16 +1,16 @@
 #!/usr/bin/env python2
 # encoding: utf-8
-# vim: ts=4:
+# vim: ts=4 noexpandtab
 
 import urwid
 import urwid.raw_display
 import sys
 
-
 import re, sys, random
 from sorteddict import SortedDict
 
 import modules
+import field_encodings
 
 DATA = SortedDict()
 WIDMAP = {}
@@ -60,16 +60,16 @@ DATA["CONFIG_RTC_IRQ"] = {
 }
 
 DATA["CONFIG_RTC_DST"] = {
-	"name": "DST", 
+	"name": "DST",
 	"default": True,
 	'depends': [ 'CONFIG_RTC_IRQ' ],
-	"help": "Automatically adjusts real-time clock for daylight savings time", 
+	"help": "Automatically adjusts real-time clock for daylight savings time",
 }
 
 DATA["CONFIG_RTC_DST_ZONE"] = {
-	"name": "DST zone for automatic adjustment", 
+	"name": "DST zone for automatic adjustment",
 	"type": "text",
-	"default": 1, 
+	"default": 1,
 	'depends': [ 'CONFIG_RTC_DST' ],
 	"help": "DST Zone: 1=DST_US, 2=DST_MEX, 3=DST_BRZ, 4=DST_EU, 5=DST_AUS, 6=DST_NZ"
 }
@@ -101,7 +101,7 @@ DATA["TEXT_PORTS"] = {
 }
 
 DATA["CONFIG_BUTTONS_LONG_PRESS_TIME"] = {
-	"name": "Button short press time",
+	"name": "Button long press time",
 	"type": "text",
 	"default": "6",
 	"ifndef": True,
@@ -303,7 +303,7 @@ class OpenChronosApp(object):
 			if key == 'f8':
 				#raise urwid.ExitMainLoop()
 				sys.exit(0)
-		
+
 		urwid.MainLoop(frame, palette, screen,
 			unhandled_input=unhandled).run()
 
@@ -366,6 +366,9 @@ class OpenChronosApp(object):
 				continue
 			if "type" in dat and dat["type"] == "info":
 				continue
+			if "encoding" in dat:
+				fun = getattr(field_encodings, dat['encoding'])
+				dat["value"] = fun(dat["value"], True)
 			if DATA[key].get("ifndef", False):
 				fp.write("#ifndef %s\n" %key)
 			if isinstance(dat["value"], bool):
@@ -409,6 +412,9 @@ class OpenChronosApp(object):
 					except ValueError:
 						value = m[1]
 					DATA[m[0]]["value"] = value
+				if "encoding" in DATA[m[0]]:
+					fun = getattr(field_encodings, DATA[m[0]]['encoding'])
+					DATA[m[0]]["value"] = fun(DATA[m[0]]["value"], False)
 			else:
 				m = match2.search(line)
 				if m and m.groups()[0] in DATA:
