@@ -256,7 +256,7 @@ void WritePATable(unsigned char value)
 // *****************************************************************************
 void WriteBurstPATable(unsigned char *buffer, unsigned char count)
 {
-	volatile char i = 0;
+	volatile unsigned char i = 0;
 	uint16_t int_state;
 
 	ENTER_CRITICAL_SECTION(int_state);

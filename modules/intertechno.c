@@ -46,6 +46,13 @@
 #define INTERTECHNO_DEF_FAMILY 12       // this translates as family 'L' on the rotary switch
 #define INTERTECHNO_DEF_DEVICE 7        // device number 7 on remotes that have devices numbered 1 to 16
                                         // or device 3 group 2 on others
+
+// PATable[1] power level (based on SmartRF Studio)
+//#define INTERTECHNO_RF_POWER   0x26     // -12 dBm   ~13mA peak
+//#define INTERTECHNO_RF_POWER   0x2d     //  -6 dBm
+#define INTERTECHNO_RF_POWER   0x50     //   0 dBm
+//#define INTERTECHNO_RF_POWER   0xc6     //  10 dBm   ~18mA peak
+
 uint8_t rotate_byte(uint8_t in);
 void it_rf_init(void);
 void it_tx_cmd(uint8_t prefix, uint8_t cmd);
@@ -152,7 +159,8 @@ void mod_intertechno_init()
 
 void it_rf_init(void)
 {
-    uint8_t PATable[2] = { 0x00, 0xC3 };    // logic 0 and logic 1 power levels for OOK modulation
+    // logic 0 and logic 1 power levels for OOK modulation
+    uint8_t PATable[2] = { 0x00, INTERTECHNO_RF_POWER };
 
     ResetRadioCore();
 

@@ -17,4 +17,5 @@ void ReadBurstReg(unsigned char addr, unsigned char *buffer, unsigned char count
 void WriteBurstReg(unsigned char addr, unsigned char *buffer, unsigned char count);
 void ResetRadioCore(void);
 void WritePATable(unsigned char value);
+void WriteBurstPATable(unsigned char *buffer, unsigned char count);
 void WaitForXT2(void);
