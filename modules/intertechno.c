@@ -22,6 +22,9 @@
 //
 // Line2 becomes 'on', 'off', 'spe' depending on what command was sent last
 //
+// if compile time option CONFIG_INTERTECHNO_PW is set then the output power is 
+// selectable.
+//
 // radio glyphs come up when the command is sent.
 //
 // buttons:
@@ -48,10 +51,16 @@
                                         // or device 3 group 2 on others
 
 // PATable[1] power level (based on SmartRF Studio)
+#ifdef CONFIG_INTERTECHNO_PW
+uint8_t it_pwr[4] = { 0x26, 0x2d, 0x50, 0xc6 };
+uint8_t it_pwr_level = 2;
+uint8_t it_tmp_pwr_level = 2;
+#else
 //#define INTERTECHNO_RF_POWER   0x26     // -12 dBm   ~13mA peak
 //#define INTERTECHNO_RF_POWER   0x2d     //  -6 dBm
 #define INTERTECHNO_RF_POWER   0x50     //   0 dBm
 //#define INTERTECHNO_RF_POWER   0xc6     //  10 dBm   ~18mA peak
+#endif
 
 uint8_t rotate_byte(uint8_t in);
 void it_rf_init(void);
@@ -68,6 +77,9 @@ static void intertechno_activated()
     sys_messagebus_register(&it_tx_end, SYS_MSG_RADIO);
     _printf(0, LCD_SEG_L1_3_2, "%02u", it_family);
     _printf(0, LCD_SEG_L1_1_0, "%02u", it_device);
+#ifdef CONFIG_INTERTECHNO_PW
+    _printf(0, LCD_SEG_L2_4_3, "%02x", it_pwr[it_pwr_level]);
+#endif
     display_symbol(0, LCD_SEG_L1_DP1, SEG_ON);
 }
 
@@ -128,16 +140,40 @@ static void it_edit_dd_set(int8_t step)
     _printf(0, LCD_SEG_L1_1_0, "%02u", it_tmp_device);
 }
 
+#ifdef CONFIG_INTERTECHNO_PW
+static void it_edit_pwr_sel(void)
+{
+    display_chars(0, LCD_SEG_L2_4_3, NULL, BLINK_ON);
+}
+
+static void it_edit_pwr_dsel(void)
+{
+    display_chars(0, LCD_SEG_L2_4_3, NULL, BLINK_OFF);
+}
+
+static void it_edit_pwr_set(int8_t step)
+{
+    helpers_loop(&it_tmp_pwr_level, 0, 3, step);
+    _printf(0, LCD_SEG_L2_4_3, "%02x", it_pwr[it_tmp_pwr_level]);
+}
+#endif
+
 static void intertechno_save(void)
 {
     it_family = it_tmp_family;
     it_device = it_tmp_device;
+#ifdef CONFIG_INTERTECHNO_PW
+    it_pwr_level = it_tmp_pwr_level;
+#endif
 }
 
 /* edit mode item table */
 static struct menu_editmode_item intertechno_items[] = {
     {&it_edit_dd_sel, &it_edit_dd_dsel, &it_edit_dd_set},
     {&it_edit_ff_sel, &it_edit_ff_dsel, &it_edit_ff_set},
+#ifdef CONFIG_INTERTECHNO_PW
+    {&it_edit_pwr_sel, &it_edit_pwr_dsel, &it_edit_pwr_set},
+#endif
     {NULL}
 };
 
@@ -160,7 +196,11 @@ void mod_intertechno_init()
 void it_rf_init(void)
 {
     // logic 0 and logic 1 power levels for OOK modulation
+#ifdef CONFIG_INTERTECHNO_PW
+    uint8_t PATable[2] = { 0x00, it_pwr[it_pwr_level] };
+#else
     uint8_t PATable[2] = { 0x00, INTERTECHNO_RF_POWER };
+#endif
 
     ResetRadioCore();
 
