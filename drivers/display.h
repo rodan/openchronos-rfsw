@@ -332,7 +332,7 @@ void display_symbol(
 	_sprintf("%03s", 48);
 
 	// returns "0xff"
-	_sprintf("0x%02", 0xff);
+	_sprintf("0x%02x", 0xff);
 
 	// returns "st1x"
 	_sprintf("st%1ux", 1)
