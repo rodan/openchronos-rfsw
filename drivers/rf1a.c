@@ -248,7 +248,7 @@ void WritePATable(unsigned char value)
 }
 
 // *****************************************************************************
-// @fn          WritePATable
+// @fn          WriteBurstPATable
 // @brief       Write to multiple locations in power table 
 // @param       unsigned char *buffer   Pointer to the table of values to be written 
 // @param       unsigned char count     Number of values to be written

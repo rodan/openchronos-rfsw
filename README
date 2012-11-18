@@ -22,7 +22,7 @@ fork of the openchronos-ng that implements interfacing with intertechno radio sw
 
  Line2 becomes 'on', 'off', 'spe' depending on what command was sent last
 
-  if compile time option CONFIG_INTERTECHNO_PW is set then the output power is 
+  if compile time option CONFIG_MOD_INTERTECHNO_PW is set then the output power is 
  selectable.
 
  radio glyphs come up when the command is sent.

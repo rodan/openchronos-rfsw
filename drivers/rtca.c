@@ -282,7 +282,6 @@ void RTC_A_ISR(void)
 	}
 
 finish:
-
 	/* append events, since ISR could be triggered
 	 multipe times until rtca_last_event gets parsed */
 	rtca_last_event |= ev;

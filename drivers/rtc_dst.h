@@ -1,7 +1,6 @@
 /*
-    temperature.h: Temperature driver header
-
-    Copyright (C) 2012 Matthew Excell <matt@excellclan.com>
+    Daylight Saving Time for OpenChronos on the TI ez430 chronos watch.
+    Copyright 2011 Rick Miller <rdmiller3@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -15,21 +14,31 @@
 
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
+*/
 
-#ifndef __TEMPERATURE_H__
-#define __TEMPERATURE_H__
+#ifndef RTC_DST_H_
+#define RTC_DST_H_
 
-#include <openchronos.h>
+#define RTC_DST_STATE_ST 0
+#define RTC_DST_STATE_DST 1
 
-void temperature_init(void);
-void temperature_measurement(void);
-void temperature_get_C(int16_t *temp);
-void temperature_get_F(int16_t *temp);
+#define DST_US 1
+#define DST_MEX 2
+#define DST_BRZ 3
+#define DST_EU 4
+#define DST_AUS 5
+#define DST_NZ 6
 
-struct {
-	uint16_t value;
-	int16_t offset;
-} temperature;
+struct rtc_dst_date_struct {
+	uint8_t month;
+	uint8_t day;
+};
 
-#endif /* __TEMPERATURE_H__ */
+extern struct rtc_dst_date_struct dst_dates[];
+extern uint8_t rtc_dst_state;
+
+void rtc_dst_init(void);
+void rtc_dst_calculate_dates(uint16_t year, uint8_t month, uint8_t day, uint8_t hour);
+void rtc_dst_hourly_update(void);
+
+#endif

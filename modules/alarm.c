@@ -121,9 +121,9 @@ static void num_pressed()
 
 	/* Register RTC only if needed, saving CPU cycles.. */
 	if (alarm_state.state)
-		sys_messagebus_register(&alarm_event, SYS_MSG_RTC_ALARM);
+		sys_messagebus_register(alarm_event, SYS_MSG_RTC_ALARM);
 	else
-		sys_messagebus_unregister(&alarm_event);
+		sys_messagebus_unregister(alarm_event);
 
 	if (alarm_state.alarm) {
 		display_symbol(0, LCD_ICON_ALARM, SEG_ON);
