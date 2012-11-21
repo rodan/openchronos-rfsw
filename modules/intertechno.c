@@ -23,7 +23,7 @@
 // Line2 becomes 'on', 'off', 'spe' depending on what command was sent last
 //
 // if compile time option CONFIG_MOD_INTERTECHNO_PW is set then the output power is 
-// selectable.
+// selectable on Line2.
 //
 // radio glyphs come up when the command is sent.
 //
@@ -31,8 +31,8 @@
 //
 // up      - send an 'on' command on the current device
 // down    - send an 'off' command
-// up+down - send a special command (for doorbells/PIRs), make sure DD is 8 in this case.
-// #       - enter config mode. use up, down, # to select family and device, * to save.
+// #       - send a special command (for doorbells/PIRs), make sure DD is 8 in this case.
+// long *  - enter config mode. use up, down, # to select family and device, * to save.
 //
 
 #include <openchronos.h>
@@ -58,8 +58,8 @@ uint8_t it_tmp_pwr_level = 2;
 #else
 //#define INTERTECHNO_RF_POWER   0x26     // -12 dBm   ~13mA peak
 //#define INTERTECHNO_RF_POWER   0x2d     //  -6 dBm
-#define INTERTECHNO_RF_POWER   0x50     //   0 dBm
-//#define INTERTECHNO_RF_POWER   0xc6     //  10 dBm   ~18mA peak
+//#define INTERTECHNO_RF_POWER   0x50     //   0 dBm
+#define INTERTECHNO_RF_POWER   0xc6     //  10 dBm   ~18mA peak
 #endif
 
 uint8_t rotate_byte(uint8_t in);
@@ -78,7 +78,7 @@ static void intertechno_activated()
     _printf(0, LCD_SEG_L1_3_2, "%02u", it_family);
     _printf(0, LCD_SEG_L1_1_0, "%02u", it_device);
 #ifdef CONFIG_MOD_INTERTECHNO_PW
-    _printf(0, LCD_SEG_L2_4_3, "%02x", it_pwr[it_pwr_level]);
+    _printf(0, LCD_SEG_L2_1_0, "%02x", it_pwr[it_pwr_level]);
 #endif
     display_symbol(0, LCD_SEG_L1_DP1, SEG_ON);
 }
@@ -101,7 +101,7 @@ static void intertechno_down_pressed()
     display_chars(0, LCD_SEG_L2_2_0, "OFF", SEG_SET);
 }
 
-static void intertechno_updown_pressed()
+static void intertechno_num_pressed()
 {
     it_tx_cmd(((it_family - 1) << 4) + it_device - 1, INTERTECHNO_CMD_SP);
     display_chars(0, LCD_SEG_L2_2_0, "SPE", SEG_SET);
@@ -143,18 +143,19 @@ static void it_edit_dd_set(int8_t step)
 #ifdef CONFIG_MOD_INTERTECHNO_PW
 static void it_edit_pwr_sel(void)
 {
-    display_chars(0, LCD_SEG_L2_4_3, NULL, BLINK_ON);
+    _printf(0, LCD_SEG_L2_2_0, " %02x", it_pwr[it_pwr_level]);
+    display_chars(0, LCD_SEG_L2_1_0, NULL, BLINK_ON);
 }
 
 static void it_edit_pwr_dsel(void)
 {
-    display_chars(0, LCD_SEG_L2_4_3, NULL, BLINK_OFF);
+    display_chars(0, LCD_SEG_L2_1_0, NULL, BLINK_OFF);
 }
 
 static void it_edit_pwr_set(int8_t step)
 {
     helpers_loop(&it_tmp_pwr_level, 0, 3, step);
-    _printf(0, LCD_SEG_L2_4_3, "%02x", it_pwr[it_tmp_pwr_level]);
+    _printf(0, LCD_SEG_L2_1_0, "%02x", it_pwr[it_tmp_pwr_level]);
 }
 #endif
 
@@ -177,7 +178,7 @@ static struct menu_editmode_item intertechno_items[] = {
     {NULL}
 };
 
-static void intertechno_num_pressed()
+static void intertechno_star_long_pressed()
 {
     menu_editmode_start(&intertechno_save, intertechno_items);
 }
@@ -188,8 +189,8 @@ void mod_intertechno_init()
                    &intertechno_up_pressed,
                    &intertechno_down_pressed,
                    &intertechno_num_pressed,
-                   NULL,
-                   NULL, &intertechno_updown_pressed,
+                   &intertechno_star_long_pressed,
+                   NULL, NULL,
                    &intertechno_activated, &intertechno_deactivated);
 }
 

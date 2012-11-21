@@ -23,7 +23,7 @@ fork of the openchronos-ng that implements interfacing with intertechno radio sw
  Line2 becomes 'on', 'off', 'spe' depending on what command was sent last
 
   if compile time option CONFIG_MOD_INTERTECHNO_PW is set then the output power is 
- selectable.
+ selectable on Line2.
 
  radio glyphs come up when the command is sent.
 
@@ -31,8 +31,8 @@ fork of the openchronos-ng that implements interfacing with intertechno radio sw
 
  up      - send an 'on' command on the current device
  down    - send an 'off' command
- up+down - send a special command (for doorbells/PIRs), make sure DD is 8 in this case.
- #       - enter config mode. use up, down, # to select family and device, * to save.
+ #       - send a special command (for doorbells/PIRs), make sure DD is 8 in this case.
+ long *  - enter config mode. use up, down, # to select family and device, * to save.
 
 forked on the 30th Oct 2012 from
 openchronos-ng - http://openchronos-ng.sourceforge.net/
