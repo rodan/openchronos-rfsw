@@ -29,7 +29,7 @@
 //
 // buttons:
 //
-// up      - send an 'on' command on the current device
+// up      - send an 'on' command to the current device
 // down    - send an 'off' command
 // #       - send a special command (for doorbells/PIRs), make sure DD is 8 in this case.
 // long *  - enter config mode. use up, down, # to select family and device, * to save.
