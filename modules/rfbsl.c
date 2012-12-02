@@ -78,16 +78,6 @@ static void updown_press()
 	CALL_RFSBL();
 }
 
-static void rfbsl_num_pressed()
-{
-	// Write RAM to indicate we will be downloading the RAM Updater first
-	display_chars(0, LCD_SEG_L1_3_0, " RAM", SEG_ON);
-
-	// Call RFBSL
-	CALL_RFSBL();
-}
-
-
 
 // *************************************************************************************************
 // @fn          display_rfbsl
@@ -110,7 +100,7 @@ static void rfbsl_deactivate()
 
 void mod_rfbsl_init(void)
 {
-	menu_add_entry("RFBSL", NULL, NULL, &rfbsl_num_pressed, NULL, NULL,
+	menu_add_entry("RFBSL", NULL, NULL, NULL, NULL, NULL,
 						&updown_press,
 						&rfbsl_activate,
 						&rfbsl_deactivate);
