@@ -149,14 +149,6 @@ enum display_segment_array {
 };
 
 /*!
-	\brief Initializes the display
-	\details This functions is called once upon system initialization.
-	\note Modules are strictly forbidden to call this function.
-	\internal
-*/
-void lcd_init(void);
-
-/*!
 	\brief Virtual LCD screen
 	\sa #lcd_screens_create()
 */
@@ -332,7 +324,7 @@ void display_symbol(
 	_sprintf("%03s", 48);
 
 	// returns "0xff"
-	_sprintf("0x%02x", 0xff);
+	_sprintf("0x%02", 0xff);
 
 	// returns "st1x"
 	_sprintf("st%1ux", 1)

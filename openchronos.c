@@ -1,6 +1,6 @@
 /*
     openchronos.c: openchronos-ng main loop & user interface
-	 
+
 	 Copyright (C) 2012 Angelo Arrifano <miknix@gmail.com>
 
 	          http://www.openchronos-ng.sourceforge.net
@@ -75,7 +75,6 @@
 #include <drivers/rtca.h>
 #include <drivers/temperature.h>
 #include <drivers/battery.h>
-#include <drivers/radio.h>
 
 #define BIT_IS_SET(F, B)  ((F) | (B)) == (F)
 
@@ -183,6 +182,12 @@ void check_events(void)
 		as_last_interrupt = 0;
 	}
 
+	/* drivers/buzzer */
+	if(buzzer_finished) {
+		msg |= SYS_MSG_BUZ_FINISHED;
+		buzzer_finished = 0;
+	}
+
 #ifdef CONFIG_BATTERY_MONITOR
 	/* drivers/battery */
 	if ((msg & SYS_MSG_RTC_MINUTE) == SYS_MSG_RTC_MINUTE) {
@@ -192,10 +197,10 @@ void check_events(void)
 #endif
 
 	/* drivers/radio */
-	if(radio_last_event){
-		msg |= SYS_MSG_RADIO;
-		radio_last_event = 0;
-	}
+    if(radio_last_event){
+        msg |= SYS_MSG_RADIO;
+        radio_last_event = 0;
+    }
 
 	{
 		struct sys_messagebus *p = messagebus;
@@ -251,15 +256,15 @@ static void menumode_handler(void)
 	if (BIT_IS_SET(ports_pressed_btns, PORTS_BTN_STAR)) {
 		/* exit mode mode */
 		menumode.enabled = 0;
-	
+
 		/* clear both lines but keep symbols! */
 		display_clear(0, 1);
 		display_clear(0, 2);
-		
+
 		/* turn off up/down symbols */
 		display_symbol(0, LCD_SYMB_ARROW_UP, SEG_OFF);
 		display_symbol(0, LCD_SYMB_ARROW_DOWN, SEG_OFF);
-		
+
 		/* stop blinking name of current selected module */
 		display_chars(0, LCD_SEG_L2_4_0, NULL, BLINK_OFF);
 
@@ -321,7 +326,7 @@ static void check_buttons(void)
 		} else if (BIT_IS_SET(ports_pressed_btns, PORTS_BTN_NUM)) {
 			if (menumode.item->num_btn_fn)
 				menumode.item->num_btn_fn();
-		
+
 		} else if (BIT_IS_SET(ports_pressed_btns, PORTS_BTN_UP | PORTS_BTN_DOWN)) {
 			if (menumode.item->updown_btn_fn)
 				menumode.item->updown_btn_fn();
@@ -358,7 +363,7 @@ void menu_add_entry(char const * name,
 		menu_p->next = menu_p;
 		menu_p->prev = menu_p;
 		*menu_hd = menu_p;
-		
+
 		/* There wasnt any menu active, so we activate this one */
 		menumode.item = menu_p;
 		activate_fn();
@@ -414,53 +419,6 @@ void init_application(void)
 #endif
 
 	// ---------------------------------------------------------------------
-	// Configure PMM
-	SetVCore(3);
-
-	// Set global high power request enable
-	PMMCTL0_H  = 0xA5;
-	PMMCTL0_L |= PMMHPMRE;
-	PMMCTL0_H  = 0x00;
-
-	// ---------------------------------------------------------------------
-	// Enable 32kHz ACLK
-	P5SEL |= 0x03;                            // Select XIN, XOUT on P5.0 and P5.1
-	UCSCTL6 &= ~XT1OFF;        				  // XT1 On, Highest drive strength
-	UCSCTL6 |= XCAP_3;                        // Internal load cap
-
-	UCSCTL3 = SELA__XT1CLK;                   // Select XT1 as FLL reference
-	UCSCTL4 = SELA__XT1CLK | SELS__DCOCLKDIV | SELM__DCOCLKDIV;
-
-	// ---------------------------------------------------------------------
-	// Configure CPU clock for 12MHz
-	_BIS_SR(SCG0);                  // Disable the FLL control loop
-	UCSCTL0 = 0x0000;          // Set lowest possible DCOx, MODx
-	UCSCTL1 = DCORSEL_5;       // Select suitable range
-	UCSCTL2 = FLLD_1 + 0x16E;  // Set DCO Multiplier
-	_BIC_SR(SCG0);                  // Enable the FLL control loop
-
-	// Worst-case settling time for the DCO when the DCO range bits have been
-	// changed is n x 32 x 32 x f_MCLK / f_FLL_reference. See UCS chapter in 5xx
-	// UG for optimization.
-	// 32 x 32 x 8 MHz / 32,768 Hz = 250000 = MCLK cycles for DCO to settle
-#if __GNUC_MINOR__ > 5 || __GNUC_PATCHLEVEL__ > 8
-	__delay_cycles(250000);
-#else
-	__delay_cycles(62500);
-        __delay_cycles(62500);
-        __delay_cycles(62500);
-        __delay_cycles(62500);
-#endif
-  
-	// Loop until XT1 & DCO stabilizes, use do-while to insure that 
-	// body is executed at least once
-	do {
-		UCSCTL7 &= ~(XT2OFFG + XT1LFOFFG + XT1HFOFFG + DCOFFG);
-		SFRIFG1 &= ~OFIFG;                      // Clear fault flags
-	} while ((SFRIFG1 & OFIFG));
-
-
-	// ---------------------------------------------------------------------
 	// Configure port mapping
 
 	// Disable all interrupts
@@ -509,19 +467,15 @@ void init_application(void)
 #endif
 
 	// ---------------------------------------------------------------------
-	// Init LCD
-	lcd_init();
-
-	// ---------------------------------------------------------------------
 	// Init buttons
 	init_buttons();
 
 	// ---------------------------------------------------------------------
 	// Configure Timer0 for use by the clock and delay functions
 	timer0_init();
-	
+
 	/* Init buzzer */
-	buzzer_init();
+	//buzzer_init();
 
 	// ---------------------------------------------------------------------
 	// Init pressure sensor
@@ -540,6 +494,21 @@ void init_application(void)
 #endif
 }
 
+inline void sleep_and_service_wd()
+{
+	/* Go to appropriate LPM, wait for interrupts */
+	if(BUZZER_PLAYING)
+		_BIS_SR(LPM1_bits + GIE);
+	else
+		_BIS_SR(LPM3_bits + GIE);
+	__no_operation();
+
+	/* service watchdog on wakeup */
+#ifdef USE_WATCHDOG
+	// Service watchdog (reset counter)
+	WDTCTL = (WDTCTL & 0xff) | WDTPW | WDTCNTCL;
+#endif
+}
 
 /***************************************************************************
  ************************ ENTRYPOINT AND MAIN LOOP *************************
@@ -547,7 +516,7 @@ void init_application(void)
 int main(void)
 {
 	// Init MCU
-	init_application();	
+	init_application();
 
 #ifdef CONFIG_TEST
 	// Branch to welcome screen
@@ -562,15 +531,8 @@ int main(void)
 
 	/* main loop */
 	while (1) {
-		/* Go to LPM3, wait for interrupts */
-		_BIS_SR(LPM3_bits + GIE);
-		__no_operation();
-
-		/* service watchdog on wakeup */
-		#ifdef USE_WATCHDOG
-			// Service watchdog (reset counter)
-			WDTCTL = (WDTCTL & 0xff) | WDTPW | WDTCNTCL;
-		#endif
+		/* Go to the appropriate level of LPM and service watchdog */
+		sleep_and_service_wd();
 
 		/* check if any driver has events pending */
 		check_events();

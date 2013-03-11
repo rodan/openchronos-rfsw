@@ -20,6 +20,8 @@
  */
 
 #include <openchronos.h>
+#include <stdlib.h>
+#include <string.h>
 
 
 #include "buzzer.h"
@@ -30,7 +32,6 @@
 #define PITCH(note) (note & 0x000F)
 
 uint16_t base_notes[13] = {
-	0,    /* 0: P  */
 	2383, /* 1: A  */
 	2249, /* 2: A# */
 	2123, /* 3: B  */
@@ -53,12 +54,15 @@ inline void buzzer_init(void)
 	/* Enable IRQ, set output mode "toggle" */
 	TA1CCTL0 = OUTMOD_4;
 
+	/* initialize buzzer_buffer value */
+	buzzer_finished = 0;
+
 	/* Play "welcome" chord: A major */
-	note welcome[4] = {0x1901, 0x1904, 0x1908, 0x000F};
+	note welcome[4] = {0x1901, 0x1904, 0x1908, 0x0000};
 	buzzer_play(welcome);
 }
 
-inline void buzzer_stop(void)
+void buzzer_stop(void)
 {
 	/* Stop PWM timer */
 	TA1CTL &= ~MC_3;
@@ -69,35 +73,70 @@ inline void buzzer_stop(void)
 
 	/* Clear PWM timer interrupt */
 	TA1CCTL0 &= ~CCIE;
+
+	/* Signal messagebus that we're finished */
+	buzzer_finished = 1;
+
+	/* Buzzer buffer must be freed by the application using it */
+	free(buzzer_buffer);
+	buzzer_buffer = NULL;
+	buzzer_counter = 0;
+	/* This is not actually needed, but I prefer
+	 * having the counter equal to 0 if we're not
+	 * playing anything.
+	 */
+}
+
+void buzzer_callback()
+{
+	/* Start by incrementing the counter; we are playing the next note
+	 * This is here because the index must atually point to the note
+	 * currently playing, so main knows if we can go to LPM3 */
+	buzzer_counter++;
+
+	/* Here the -1 is needed for the offset of buzzer_counter due to the
+	 * increment above. */
+	note n = *(buzzer_buffer + buzzer_counter - 1);
+	/* 0x000F is the "stop bit" */
+	if(PITCH(n) == 0) {
+		/* Stop buzzer */
+		buzzer_stop();
+		return;
+	}
+	if (PITCH(n) == 0x000F) {
+		/* Stop the timer! We are playing a rest */
+		TA1CTL &= ~MC_3;
+	} else {
+		/* Set PWM frequency */
+		TA1CCR0 = base_notes[PITCH(n)] >> OCTAVE(n);
+
+		/* Start the timer */
+		TA1CTL |= MC__UP;
+	}
+
+	/* Delay for DURATION(*n) milliseconds, */
+	timer0_delay_callback(DURATION(n), &buzzer_callback);
 }
 
 void buzzer_play(note *notes)
 {
+	/* TODO: Define correct behaviour here. Should we error out or just
+	 * return? Should we return an error code? or just crash, to identify
+	 * and eliminate any race condition? Or just replace the buffer? */
+	if(buzzer_buffer != NULL)
+		buzzer_stop();
+
+	uint8_t len = 0;
+	while (notes[len] != 0) len++;
+
+	len++; /* We count the end note to get actual length */
+	buzzer_buffer = malloc(len * sizeof(notes));
+	memcpy(buzzer_buffer, notes, len * sizeof(notes));
+	buzzer_counter = 0;
 
 	/* Allow buzzer PWM output on P2.7 */
 	P2SEL |= BIT7;
 
-	/* 0x000F is the "stop bit" */
-	while (PITCH(*notes) != 0x000F) {
-		if (PITCH(*notes) == 0) {
-			/* Stop the timer! We are playing a rest */
-			TA1CTL &= ~MC_3;
-		} else {
-			/* Set PWM frequency */
-			TA1CCR0 = base_notes[PITCH(*notes)] >> OCTAVE(*notes);
-
-			/* Start the timer */
-			TA1CTL |= MC__UP;
-		}
-
-		/* Delay for DURATION(*notes) milliseconds,
-		   use LPM1 because we need SMCLK for tone generation */
-		timer0_delay(DURATION(*notes), LPM1_bits);
-
-		/* Advance to the next note */
-		notes++;
-	}
-
-	/* Stop buzzer */
-	buzzer_stop();
+	/* Play first note */
+	buzzer_callback();
 }

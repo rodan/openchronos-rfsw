@@ -46,7 +46,7 @@ const uint16_t mgrav_per_bit[7] = { 18, 36, 71, 143, 286, 571, 1142 };
 
 // *** Tunes for accelerometer synestesia
 
-static note smb[] = {0x2588, 0x000F};
+static note smb[] = {0x2588, 0x0000};
 
 // *************************************************************************************************
 // Global Variable section
