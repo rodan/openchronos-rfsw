@@ -14,8 +14,9 @@ BASH := $(shell which bash || which bash)
 .PHONY: doc
 .PHONY: httpdoc
 .PHONY: force
+.PHONY: tags
 
-all: new_timestamps depend config.h openchronos.txt
+all: new_timestamps depend config.h openchronos.txt tags
 
 #
 # Build list of sources and objects to build
@@ -84,6 +85,10 @@ config.h:
 
 new_timestamps:
 	@$(BASH) ./tools/update_rtca_now.sh
+
+tags: $(SRCS)
+	@echo "Generating tags .."
+	@exuberant-ctags -R
 
 config:
 	$(PYTHON) tools/config.py
