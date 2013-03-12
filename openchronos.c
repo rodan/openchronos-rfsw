@@ -112,6 +112,12 @@ static struct {
 	struct menu *item;      /* the currently active menu item */
 } menumode;
 
+/* systemtime when the menu mode will be canceled */
+uint32_t autocancel_time;
+struct menu *menu_last;
+#define MENU_AUTOCANCEL_DELAY 5
+#define EDIT_AUTOCANCEL_DELAY 15
+
 /* Menu edit mode stuff */
 static struct {
 	uint8_t enabled:1;          /* is edit mode enabled? */
@@ -226,7 +232,7 @@ void check_events(void)
 static void editmode_handler(void)
 {
 	/* STAR button exits edit mode */
-	if (BIT_IS_SET(ports_pressed_btns, PORTS_BTN_STAR)) {
+	if (BIT_IS_SET(ports_pressed_btns, PORTS_BTN_STAR) || (rtca_time.sys >= autocancel_time)) {
 		/* deselect item */
 		menu_editmode.items[menu_editmode.pos].deselect();
 
@@ -234,6 +240,7 @@ static void editmode_handler(void)
 		menu_editmode.enabled = 0;
 
 	} else if (BIT_IS_SET(ports_pressed_btns, PORTS_BTN_NUM)) {
+		autocancel_time = rtca_time.sys + EDIT_AUTOCANCEL_DELAY;
 		/* deselect current item */
 		menu_editmode.items[menu_editmode.pos].deselect();
 
@@ -244,16 +251,18 @@ static void editmode_handler(void)
 		menu_editmode.items[menu_editmode.pos].select();
 
 	} else if (BIT_IS_SET(ports_pressed_btns, PORTS_BTN_UP)) {
+		autocancel_time = rtca_time.sys + EDIT_AUTOCANCEL_DELAY;
 		menu_editmode.items[menu_editmode.pos].set(1);
 
 	} else if (BIT_IS_SET(ports_pressed_btns, PORTS_BTN_DOWN)) {
+		autocancel_time = rtca_time.sys + EDIT_AUTOCANCEL_DELAY;
 		menu_editmode.items[menu_editmode.pos].set(-1);
 	}
 }
 
 static void menumode_handler(void)
 {
-	if (BIT_IS_SET(ports_pressed_btns, PORTS_BTN_STAR)) {
+	if (BIT_IS_SET(ports_pressed_btns, PORTS_BTN_STAR) || (rtca_time.sys >= autocancel_time)) {
 		/* exit mode mode */
 		menumode.enabled = 0;
 
@@ -268,15 +277,21 @@ static void menumode_handler(void)
 		/* stop blinking name of current selected module */
 		display_chars(0, LCD_SEG_L2_4_0, NULL, BLINK_OFF);
 
+		if (rtca_time.sys >= autocancel_time) {
+			menumode.item = menu_last;
+		}
+
 		/* activate item */
 		if (menumode.item->activate_fn)
 			menumode.item->activate_fn();
 
 	} else if (BIT_IS_SET(ports_pressed_btns, PORTS_BTN_UP)) {
+		autocancel_time = rtca_time.sys + MENU_AUTOCANCEL_DELAY;
 		menumode.item = menumode.item->next;
 		display_chars(0, LCD_SEG_L2_4_0, menumode.item->name, SEG_SET);
 
 	} else if (BIT_IS_SET(ports_pressed_btns, PORTS_BTN_DOWN)) {
+		autocancel_time = rtca_time.sys + MENU_AUTOCANCEL_DELAY;
 		menumode.item = menumode.item->prev;
 		display_chars(0, LCD_SEG_L2_4_0, menumode.item->name, SEG_SET);
 	}
@@ -284,6 +299,9 @@ static void menumode_handler(void)
 
 static void menumode_enable(void)
 {
+	autocancel_time = rtca_time.sys + MENU_AUTOCANCEL_DELAY;
+	menu_last = menumode.item;
+
 	/* deactivate current menu item */
 	if (menumode.item->deactivate_fn)
 		menumode.item->deactivate_fn();
@@ -395,6 +413,7 @@ void menu_editmode_start(void (* complete_fn)(void),
 	menu_editmode.complete_fn = complete_fn;
 
 	menu_editmode.enabled = 1;
+	autocancel_time = rtca_time.sys + EDIT_AUTOCANCEL_DELAY;
 
 	/* select the first item */
 	menu_editmode.items[0].select();
