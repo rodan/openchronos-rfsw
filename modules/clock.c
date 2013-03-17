@@ -293,7 +293,7 @@ static void num_pressed()
 static void star_long_pressed()
 {
 	/* stop the hardware RTC */
-	rtca_stop();
+	//rtca_stop();
 
 #ifdef CONFIG_MOD_CLOCK_BLINKCOL
 	/* the blinking dots feature might hide the two dots, we display them
