@@ -232,14 +232,14 @@ void check_events(void)
 static void editmode_handler(void)
 {
 	/* STAR button exits edit mode */
-	if (BIT_IS_SET(ports_pressed_btns, PORTS_BTN_STAR) || (rtca_time.sys >= autocancel_time)) {
+	if (ports_button_isPressed(PORTS_BTN_STAR, 0) || (rtca_time.sys >= autocancel_time)) {
 		/* deselect item */
 		menu_editmode.items[menu_editmode.pos].deselect();
 
 		menu_editmode.complete_fn();
 		menu_editmode.enabled = 0;
 
-	} else if (BIT_IS_SET(ports_pressed_btns, PORTS_BTN_NUM)) {
+	} else if (ports_button_isPressed(PORTS_BTN_NUM, 0)) {
 		autocancel_time = rtca_time.sys + EDIT_AUTOCANCEL_DELAY;
 		/* deselect current item */
 		menu_editmode.items[menu_editmode.pos].deselect();
@@ -250,11 +250,11 @@ static void editmode_handler(void)
 			menu_editmode.pos = 0;
 		menu_editmode.items[menu_editmode.pos].select();
 
-	} else if (BIT_IS_SET(ports_pressed_btns, PORTS_BTN_UP)) {
+	} else if (ports_button_isPressed(PORTS_BTN_UP, 0)) {
 		autocancel_time = rtca_time.sys + EDIT_AUTOCANCEL_DELAY;
 		menu_editmode.items[menu_editmode.pos].set(1);
 
-	} else if (BIT_IS_SET(ports_pressed_btns, PORTS_BTN_DOWN)) {
+	} else if (ports_button_isPressed(PORTS_BTN_DOWN, 0)) {
 		autocancel_time = rtca_time.sys + EDIT_AUTOCANCEL_DELAY;
 		menu_editmode.items[menu_editmode.pos].set(-1);
 	}
@@ -262,7 +262,7 @@ static void editmode_handler(void)
 
 static void menumode_handler(void)
 {
-	if (BIT_IS_SET(ports_pressed_btns, PORTS_BTN_STAR) || (rtca_time.sys >= autocancel_time)) {
+	if (ports_button_isPressed(PORTS_BTN_STAR, 0) || (rtca_time.sys >= autocancel_time)) {
 		/* exit mode mode */
 		menumode.enabled = 0;
 
@@ -285,12 +285,12 @@ static void menumode_handler(void)
 		if (menumode.item->activate_fn)
 			menumode.item->activate_fn();
 
-	} else if (BIT_IS_SET(ports_pressed_btns, PORTS_BTN_UP)) {
+	} else if (ports_button_isPressed(PORTS_BTN_UP, 0)) {
 		autocancel_time = rtca_time.sys + MENU_AUTOCANCEL_DELAY;
 		menumode.item = menumode.item->next;
 		display_chars(0, LCD_SEG_L2_4_0, menumode.item->name, SEG_SET);
 
-	} else if (BIT_IS_SET(ports_pressed_btns, PORTS_BTN_DOWN)) {
+	} else if (ports_button_isPressed(PORTS_BTN_DOWN, 0)) {
 		autocancel_time = rtca_time.sys + MENU_AUTOCANCEL_DELAY;
 		menumode.item = menumode.item->prev;
 		display_chars(0, LCD_SEG_L2_4_0, menumode.item->name, SEG_SET);
@@ -330,36 +330,36 @@ static void check_buttons(void)
 		menumode_handler();
 
 	} else {
-		if (BIT_IS_SET(ports_pressed_btns, PORTS_BTN_LSTAR)) {
+		if (ports_button_isPressed(PORTS_BTN_LSTAR, 1)) {
 			if (menumode.item->lstar_btn_fn)
 				menumode.item->lstar_btn_fn();
 
-		} else if (BIT_IS_SET(ports_pressed_btns, PORTS_BTN_STAR)) {
+		} else if (ports_button_isPressed(PORTS_BTN_STAR, !!(menumode.item->lstar_btn_fn))) {
 			menumode_enable();
 
-		} else if (BIT_IS_SET(ports_pressed_btns, PORTS_BTN_LNUM)) {
+		} else if (ports_button_isPressed(PORTS_BTN_LNUM, 1)) {
 			if (menumode.item->lnum_btn_fn)
 				menumode.item->lnum_btn_fn();
 
-		} else if (BIT_IS_SET(ports_pressed_btns, PORTS_BTN_NUM)) {
+		} else if (ports_button_isPressed(PORTS_BTN_NUM, !!(menumode.item->lnum_btn_fn))) {
 			if (menumode.item->num_btn_fn)
 				menumode.item->num_btn_fn();
 
-		} else if (BIT_IS_SET(ports_pressed_btns, PORTS_BTN_UP | PORTS_BTN_DOWN)) {
+		} else if (ports_button_isPressed(PORTS_BTN_UP | PORTS_BTN_DOWN, 0)) {
 			if (menumode.item->updown_btn_fn)
 				menumode.item->updown_btn_fn();
 
-		} else if (BIT_IS_SET(ports_pressed_btns, PORTS_BTN_UP)) {
+		} else if (ports_button_isPressed(PORTS_BTN_UP, 0)) {
 			if (menumode.item->up_btn_fn)
 				menumode.item->up_btn_fn();
 
-		} else if (BIT_IS_SET(ports_pressed_btns, PORTS_BTN_DOWN)) {
+		} else if (ports_button_isPressed(PORTS_BTN_DOWN, 0)) {
 			if (menumode.item->down_btn_fn)
 				menumode.item->down_btn_fn();
 		}
 	}
 
-	ports_pressed_btns = 0;
+    ports_buttons_clear();
 }
 
 void menu_add_entry(char const * name,
