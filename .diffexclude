@@ -1,0 +1,6 @@
+.git
+.diffexclude
+logic
+rtca_now.h
+diff_to_upstream.patch
+simpliciti

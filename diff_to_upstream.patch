@@ -1,0 +1,926 @@
+diff -urpEbBN '--exclude=.git' '--exclude-from=.diffexclude' '--exclude-from=.gitignore' ../openchronos-ng-code/.gitignore ./.gitignore
+--- ../openchronos-ng-code/.gitignore	2013-03-23 20:45:33.985562661 +0200
++++ ./.gitignore	2013-03-23 20:26:43.719530532 +0200
+@@ -10,10 +10,10 @@ openchronos.cflags
+ *.*~
+ *.s
+ *.swp
++tools/config.pyc
+ config.h
+ .pida-metadata
+ TAGS
++tags
+ output.map
+-# Ignore NetBeans stuff
+-nbproject/
+ cscope.out
+diff -urpEbBN '--exclude=.git' '--exclude-from=.diffexclude' '--exclude-from=.gitignore' ../openchronos-ng-code/Makefile ./Makefile
+--- ../openchronos-ng-code/Makefile	2012-11-18 18:00:02.750270347 +0200
++++ ./Makefile	2013-03-23 20:44:16.771506438 +0200
+@@ -9,12 +9,15 @@ BASH := $(shell which bash || which bash
+ .PHONY: clean
+ .PHONY: install
+ .PHONY: config
++.PHONY: new_timestamps
+ .PHONY: depend
+ .PHONY: doc
+ .PHONY: httpdoc
+ .PHONY: force
++.PHONY: tags
++.PHONY: diff
+ 
+-all: drivers/rtca_now.h depend config.h openchronos.txt
++all: new_timestamps depend config.h openchronos.txt tags
+ 
+ #
+ # Build list of sources and objects to build
+@@ -81,10 +84,17 @@ modinit.c:
+ config.h:
+ 	@echo "Please do a 'make config' first!" && false
+ 
+-drivers/rtca_now.h:
+-	@echo "Generating $@"
++new_timestamps:
+ 	@$(BASH) ./tools/update_rtca_now.sh
+ 
++diff: $(SRCS)
++	@echo "Generating diff to upstream code"
++	@diff -urpEbBN --exclude=.git --exclude-from=.diffexclude --exclude-from=.gitignore ../openchronos-ng-code ./ > diff_to_upstream.patch; /bin/true
++
++tags: $(SRCS)
++	@echo "Generating tags .."
++	@exuberant-ctags -R
++
+ config:
+ 	$(PYTHON) tools/config.py
+ 	$(PYTHON) tools/make_modinit.py
+@@ -97,7 +107,6 @@ clean: $(SUBDIRS)
+ 		echo "Cleaning $$subdir .."; rm -f $$subdir/*.o; \
+ 	done
+ 	@rm -f *.o openchronos.{elf,txt,cflags,dep} output.map
+-	@rm -f drivers/rtca_now.h
+ 
+ doc:
+ 	rm -rf doc/*
+diff -urpEbBN '--exclude=.git' '--exclude-from=.diffexclude' '--exclude-from=.gitignore' ../openchronos-ng-code/README ./README
+--- ../openchronos-ng-code/README	2013-03-11 22:52:56.599918155 +0200
++++ ./README	2013-03-11 22:32:57.000000000 +0200
+@@ -1,24 +1,45 @@
+-openchronos-ng - http://openchronos-ng.sourceforge.net
+ 
+-Modular opensource firmware for the TI eZ430 Chronos.
+-Please check our homepage for the most up to date information.
++C code that can run on an Texas Instruments EZ430-Chronos 433MHz watch [1] with a software module that implements interfacing with intertechno radio switches
+ 
+-== Boot Menu & RFBSL (flashing over RF) ==
+-In openchronos-ng, the watch no longer boots directly into the
+-main menu anymore. When the watch is reset (or you put the battery
+-for the first time), you have the choice to either enter flash mode
+-(press # button) or continue into main menu (press any other button).
+-
+-== Recommended Toolchain ==
+-
+-We recommend you to use the following versions for your toolchain,
+-since certain version combinations can result in buggy code!
+-
+-msp430-binutils-2.22_p20120911
+-msp430-gcc-4.6.3_p20120406
+-msp430-libc-20120716
+-msp430mcu-20120716
+-
+-and for debugging:
+-msp430-gdb-7.2_p20111205
+-mspdebug-0.21
++
++ forked from:     http://openchronos-ng.sourceforge.net
++
++ new module:      https://github.com/rodan/openchronos-rfsw
++ author:          Petre Rodan <petre.rodan@simplex.ro>
++ license:         GNU GPLv3
++
++ Based on a nice tutorial by Christian M. Schmid
++ http://blog.chschmid.com/?page_id=193
++
++ Requirements:
++
++   msp430 toolchain
++   python-2.7
++
++ Usage:
++
++ Line1 contains FF.DD
++
++ FF is the decimal notation of the family in which the device is placed [1-16]
++                  A is 01, B is 02 ... P is 16.
++                  this option must be used for doorbell/PIR device selection
++ DD is the decimal notation of the device number [1-16]
++                  on some factory remotes devices are placed in 4 groups,
++                  in this case device 2 from group 3 is device number 10.
++                  special devices like doorbell/PIRs must be set as device number 8.
++
++ Line2 becomes 'on', 'off', 'spe' depending on what command was sent last
++
++  if compile time option CONFIG_MOD_INTERTECHNO_PW is set then the output power is 
++ selectable on Line2.
++
++ radio glyphs come up when the command is sent.
++
++ buttons:
++
++ up      - send an 'on' command to the current device
++ down    - send an 'off' command
++ #       - send a special command (for doorbells/PIRs), make sure DD is 8 in this case.
++ long *  - enter config mode. use up, down, # to select family and device, * to save.
++
++[1] http://www.ti.com/tool/ez430-chronos
+diff -urpEbBN '--exclude=.git' '--exclude-from=.diffexclude' '--exclude-from=.gitignore' ../openchronos-ng-code/drivers/buzzer.c ./drivers/buzzer.c
+--- ../openchronos-ng-code/drivers/buzzer.c	2013-03-23 20:45:33.993562873 +0200
++++ ./drivers/buzzer.c	2013-03-11 22:17:03.000000000 +0200
+@@ -20,6 +20,8 @@
+  */
+ 
+ #include <openchronos.h>
++#include <stdlib.h>
++#include <string.h>
+ 
+ 
+ #include "buzzer.h"
+@@ -30,7 +32,6 @@
+ #define PITCH(note) (note & 0x000F)
+ 
+ uint16_t base_notes[13] = {
+-	0,    /* 0: P  */
+ 	2383, /* 1: A  */
+ 	2249, /* 2: A# */
+ 	2123, /* 3: B  */
+@@ -53,12 +54,15 @@ inline void buzzer_init(void)
+ 	/* Enable IRQ, set output mode "toggle" */
+ 	TA1CCTL0 = OUTMOD_4;
+ 
++	/* initialize buzzer_buffer value */
++	buzzer_finished = 0;
++
+ 	/* Play "welcome" chord: A major */
+-	note welcome[4] = {0x1901, 0x1904, 0x1908, 0x000F};
++	note welcome[4] = {0x1901, 0x1904, 0x1908, 0x0000};
+ 	buzzer_play(welcome);
+ }
+ 
+-inline void buzzer_stop(void)
++void buzzer_stop(void)
+ {
+ 	/* Stop PWM timer */
+ 	TA1CTL &= ~MC_3;
+@@ -69,35 +73,70 @@ inline void buzzer_stop(void)
+ 
+ 	/* Clear PWM timer interrupt */
+ 	TA1CCTL0 &= ~CCIE;
+-}
+ 
+-void buzzer_play(note *notes)
+-{
++	/* Signal messagebus that we're finished */
++	buzzer_finished = 1;
+ 
+-	/* Allow buzzer PWM output on P2.7 */
+-	P2SEL |= BIT7;
++	/* Buzzer buffer must be freed by the application using it */
++	free(buzzer_buffer);
++	buzzer_buffer = NULL;
++	buzzer_counter = 0;
++	/* This is not actually needed, but I prefer
++	 * having the counter equal to 0 if we're not
++	 * playing anything.
++	 */
++}
+ 
++void buzzer_callback()
++{
++	/* Start by incrementing the counter; we are playing the next note
++	 * This is here because the index must atually point to the note
++	 * currently playing, so main knows if we can go to LPM3 */
++	buzzer_counter++;
++
++	/* Here the -1 is needed for the offset of buzzer_counter due to the
++	 * increment above. */
++	note n = *(buzzer_buffer + buzzer_counter - 1);
+ 	/* 0x000F is the "stop bit" */
+-	while (PITCH(*notes) != 0x000F) {
+-		if (PITCH(*notes) == 0) {
++	if(PITCH(n) == 0) {
++		/* Stop buzzer */
++		buzzer_stop();
++		return;
++	}
++	if (PITCH(n) == 0x000F) {
+ 			/* Stop the timer! We are playing a rest */
+ 			TA1CTL &= ~MC_3;
+ 		} else {
+ 			/* Set PWM frequency */
+-			TA1CCR0 = base_notes[PITCH(*notes)] >> OCTAVE(*notes);
++		TA1CCR0 = base_notes[PITCH(n)] >> OCTAVE(n);
+ 
+ 			/* Start the timer */
+ 			TA1CTL |= MC__UP;
+ 		}
+ 
+-		/* Delay for DURATION(*notes) milliseconds,
+-		   use LPM1 because we need SMCLK for tone generation */
+-		timer0_delay(DURATION(*notes), LPM1_bits);
+-
+-		/* Advance to the next note */
+-		notes++;
+-	}
++	/* Delay for DURATION(*n) milliseconds, */
++	timer0_delay_callback(DURATION(n), &buzzer_callback);
++}
+ 
+-	/* Stop buzzer */
++void buzzer_play(note *notes)
++{
++	/* TODO: Define correct behaviour here. Should we error out or just
++	 * return? Should we return an error code? or just crash, to identify
++	 * and eliminate any race condition? Or just replace the buffer? */
++	if(buzzer_buffer != NULL)
+ 	buzzer_stop();
++
++	uint8_t len = 0;
++	while (notes[len] != 0) len++;
++
++	len++; /* We count the end note to get actual length */
++	buzzer_buffer = malloc(len * sizeof(notes));
++	memcpy(buzzer_buffer, notes, len * sizeof(notes));
++	buzzer_counter = 0;
++
++	/* Allow buzzer PWM output on P2.7 */
++	P2SEL |= BIT7;
++
++	/* Play first note */
++	buzzer_callback();
+ }
+diff -urpEbBN '--exclude=.git' '--exclude-from=.diffexclude' '--exclude-from=.gitignore' ../openchronos-ng-code/drivers/buzzer.h ./drivers/buzzer.h
+--- ../openchronos-ng-code/drivers/buzzer.h	2013-03-23 20:45:33.993562873 +0200
++++ ./drivers/buzzer.h	2013-03-11 22:17:03.000000000 +0200
+@@ -19,8 +19,8 @@
+  * - The following 10 bits are the duration in ms of the note.
+  *
+  * There are two "meta" notes:
+- * - The note xxx0 represents no tone (a rest).
+- * - The note xxxF represents the "stop note" marking the \
++ * - The note xxxF represents no tone (a rest).
++ * - The note xxx0 represents the "stop note" marking the \
+  *   end of a note sequence.
+  *
+  * \note The stop note is needed in the play loop to determine \
+@@ -39,4 +39,30 @@ void buzzer_init(void);
+  */
+ void buzzer_play(note *notes);
+ 
++/*!
++ * \brief A pointer to the song the buzzer is currently playing.
++ * \details If there is no song playing, the value will be null.
++ */
++note *buzzer_buffer;
++
++/*!
++ * \brief A counter to keep the index of the current playing note.
++ */
++uint8_t buzzer_counter;
++
++/*!
++ * \brief This is 1 if buzzer is finished playing.
++ * \details This is used to signal the messagebus for buzzer finish events.
++ */
++uint8_t buzzer_finished;
++
++/*!
++ * \brief This macro returns true if the buzzer is actually playing a note.
++ * \details This returns true if the buzzer is playing something and the note
++ * it is currently playing is not a rest, in other words, when the buzzer does
++ * not use SMLCK.
++ */
++#define BUZZER_PLAYING (buzzer_buffer != NULL && \
++			! (*(buzzer_buffer + buzzer_counter) & 0xF))
++
+ #endif /*BUZZER_H_*/
+diff -urpEbBN '--exclude=.git' '--exclude-from=.diffexclude' '--exclude-from=.gitignore' ../openchronos-ng-code/drivers/radio.c ./drivers/radio.c
+--- ../openchronos-ng-code/drivers/radio.c	2012-11-18 18:00:02.754270297 +0200
++++ ./drivers/radio.c	2012-11-18 17:46:14.000000000 +0200
+@@ -39,6 +39,7 @@
+ #include <openchronos.h>
+ 
+ // driver
++#include "radio.h"
+ #include "rf1a.h"
+ 
+ // *************************************************************************************************
+@@ -171,7 +172,10 @@ void radio_ISR(void)
+ 	/*if (is_rf()) {
+ 		MRFI_RadioIsr();
+ 	} else {*/
+-		if (rf1aivec == RF1AIV_NONE) { // RF1A interface interrupt (error etc.)
++	if (rf1aivec == RF1AIV_RFIFG9) { // end of packet
++		RF1AIE &= ~BIT9;      // Disable TX end-of-packet interrupt
++		radio_last_event |= RADIO_EV_RFIFG9;
++	} else if (rf1aivec == RF1AIV_NONE) { // RF1A interface interrupt (error etc.)
+ 			asm("	nop"); // break here
+ 		}
+ 	/*}*/
+diff -urpEbBN '--exclude=.git' '--exclude-from=.diffexclude' '--exclude-from=.gitignore' ../openchronos-ng-code/drivers/radio.h ./drivers/radio.h
+--- ../openchronos-ng-code/drivers/radio.h	2012-11-18 17:58:31.411418634 +0200
++++ ./drivers/radio.h	2012-11-18 17:46:14.000000000 +0200
+@@ -45,4 +45,11 @@ extern void close_radio(void);
+ extern void pmm_set_high_current_mode(void);
+ extern void pmm_set_low_current_mode(void);
+ 
++enum radio_tevent {
++	RADIO_EV_RFIFG9	= BIT0, // end of packet
++};
++
++/* exclusive use by openchronos system */
++volatile enum radio_tevent radio_last_event;
++
+ #endif /*RADIO_H_*/
+diff -urpEbBN '--exclude=.git' '--exclude-from=.diffexclude' '--exclude-from=.gitignore' ../openchronos-ng-code/drivers/rf1a.c ./drivers/rf1a.c
+--- ../openchronos-ng-code/drivers/rf1a.c	2012-11-18 17:58:31.411418634 +0200
++++ ./drivers/rf1a.c	2012-11-18 18:05:46.000000000 +0200
+@@ -247,4 +247,31 @@ void WritePATable(unsigned char value)
+ 	EXIT_CRITICAL_SECTION(int_state);
+ }
+ 
++// *****************************************************************************
++// @fn          WriteBurstPATable
++// @brief       Write to multiple locations in power table 
++// @param       unsigned char *buffer   Pointer to the table of values to be written 
++// @param       unsigned char count     Number of values to be written
++// @return      none
++// *****************************************************************************
++void WriteBurstPATable(unsigned char *buffer, unsigned char count)
++{
++	volatile unsigned char i = 0;
++	uint16_t int_state;
+ 
++	ENTER_CRITICAL_SECTION(int_state);
++
++	while (!(RF1AIFCTL1 & RFINSTRIFG)) ;
++	RF1AINSTRW = 0x7E00 + buffer[i];    // PA Table burst write   
++
++	for (i = 1; i < count; i++) {
++		RF1ADINB = buffer[i];   // Send data
++		while (!(RFDINIFG & RF1AIFCTL1)) ;      // Wait for TX to finish
++	}
++	i = RF1ADOUTB;              // Reset RFDOUTIFG flag which contains status byte
++
++	while (!(RF1AIFCTL1 & RFINSTRIFG)) ;
++	RF1AINSTRB = RF_SNOP;       // reset PA Table pointer
++
++	EXIT_CRITICAL_SECTION(int_state);
++}
+diff -urpEbBN '--exclude=.git' '--exclude-from=.diffexclude' '--exclude-from=.gitignore' ../openchronos-ng-code/drivers/rf1a.h ./drivers/rf1a.h
+--- ../openchronos-ng-code/drivers/rf1a.h	2012-11-18 17:58:31.411418634 +0200
++++ ./drivers/rf1a.h	2012-11-18 17:46:14.000000000 +0200
+@@ -17,4 +17,5 @@ void ReadBurstReg(unsigned char addr, un
+ void WriteBurstReg(unsigned char addr, unsigned char *buffer, unsigned char count);
+ void ResetRadioCore(void);
+ void WritePATable(unsigned char value);
++void WriteBurstPATable(unsigned char *buffer, unsigned char count);
+ void WaitForXT2(void);
+diff -urpEbBN '--exclude=.git' '--exclude-from=.diffexclude' '--exclude-from=.gitignore' ../openchronos-ng-code/modules/accelerometer.c ./modules/accelerometer.c
+--- ../openchronos-ng-code/modules/accelerometer.c	2013-03-23 20:45:34.001563086 +0200
++++ ./modules/accelerometer.c	2013-03-11 22:17:03.000000000 +0200
+@@ -46,7 +46,7 @@ const uint16_t mgrav_per_bit[7] = { 18,
+ 
+ // *** Tunes for accelerometer synestesia
+ 
+-static note smb[] = {0x2588, 0x000F};
++static note smb[] = {0x2588, 0x0000};
+ 
+ // *************************************************************************************************
+ // Global Variable section
+diff -urpEbBN '--exclude=.git' '--exclude-from=.diffexclude' '--exclude-from=.gitignore' ../openchronos-ng-code/modules/clock.c ./modules/clock.c
+--- ../openchronos-ng-code/modules/clock.c	2012-11-18 18:00:02.762270197 +0200
++++ ./modules/clock.c	2013-03-17 15:44:13.000000000 +0200
+@@ -293,7 +293,7 @@ static void num_pressed()
+ static void star_long_pressed()
+ {
+ 	/* stop the hardware RTC */
+-	rtca_stop();
++	//rtca_stop();
+ 
+ #ifdef CONFIG_MOD_CLOCK_BLINKCOL
+ 	/* the blinking dots feature might hide the two dots, we display them
+diff -urpEbBN '--exclude=.git' '--exclude-from=.diffexclude' '--exclude-from=.gitignore' ../openchronos-ng-code/modules/intertechno.c ./modules/intertechno.c
+--- ../openchronos-ng-code/modules/intertechno.c	1970-01-01 02:00:00.000000000 +0200
++++ ./modules/intertechno.c	2012-11-21 18:46:53.000000000 +0200
+@@ -0,0 +1,311 @@
++//
++// code used to control Intertechno radio switches
++//
++// Author:          Petre Rodan <petre.rodan@simplex.ro>
++// Available from:  https://github.com/rodan/openchronos-rfsw
++// License:         GNU GPLv3
++//
++// Based on a nice tutorial by Christian M. Schmid
++// http://blog.chschmid.com/?page_id=193
++//
++// Usage:
++//
++// Line1 contains FF.DD
++//
++// FF is the decimal notation of the family in which the device is placed [1-16]
++//                  A is 01, B is 02 ... P is 16.
++//                  this option must be used for doorbell/PIR device selection
++// DD is the decimal notation of the device number [1-16]
++//                  on some factory remotes devices are placed in 4 groups,
++//                  in this case device 2 from group 3 is device number 10.
++//                  special devices like doorbell/PIRs must be set as device number 8.
++//
++// Line2 becomes 'on', 'off', 'spe' depending on what command was sent last
++//
++// if compile time option CONFIG_MOD_INTERTECHNO_PW is set then the output power is 
++// selectable on Line2.
++//
++// radio glyphs come up when the command is sent.
++//
++// buttons:
++//
++// up      - send an 'on' command to the current device
++// down    - send an 'off' command
++// #       - send a special command (for doorbells/PIRs), make sure DD is 8 in this case.
++// long *  - enter config mode. use up, down, # to select family and device, * to save.
++//
++
++#include <openchronos.h>
++#include <drivers/display.h>
++#include <drivers/timer.h>
++#include <drivers/rf1a.h>
++
++#define INTERTECHNO_CMD_ON  0x07        // command for turning switches on
++#define INTERTECHNO_CMD_OFF 0x06        // command for turning switches off
++#define INTERTECHNO_CMD_SP  0x0f        // special devices like doorbells, PIR detectors use this cmd
++#define INTERTECHNO_SEQ_SIZE  16        // sequence buffer size to be allocated
++
++// starting values
++#define INTERTECHNO_DEF_FAMILY 12       // this translates as family 'L' on the rotary switch
++#define INTERTECHNO_DEF_DEVICE 7        // device number 7 on remotes that have devices numbered 1 to 16
++                                        // or device 3 group 2 on others
++
++// PATable[1] power level (based on SmartRF Studio)
++#ifdef CONFIG_MOD_INTERTECHNO_PW
++uint8_t it_pwr[4] = { 0x26, 0x2d, 0x50, 0xc6 };
++uint8_t it_pwr_level = 2;
++uint8_t it_tmp_pwr_level = 2;
++#else
++//#define INTERTECHNO_RF_POWER   0x26     // -12 dBm   ~13mA peak
++//#define INTERTECHNO_RF_POWER   0x2d     //  -6 dBm
++//#define INTERTECHNO_RF_POWER   0x50     //   0 dBm
++#define INTERTECHNO_RF_POWER   0xc6     //  10 dBm   ~18mA peak
++#endif
++
++uint8_t rotate_byte(uint8_t in);
++void it_rf_init(void);
++void it_tx_cmd(uint8_t prefix, uint8_t cmd);
++static void it_tx_end(enum sys_message msg);
++
++uint8_t it_family = INTERTECHNO_DEF_FAMILY;
++uint8_t it_device = INTERTECHNO_DEF_DEVICE;
++uint8_t it_tmp_family = INTERTECHNO_DEF_FAMILY;
++uint8_t it_tmp_device = INTERTECHNO_DEF_DEVICE;
++
++static void intertechno_activated()
++{
++    sys_messagebus_register(&it_tx_end, SYS_MSG_RADIO);
++    _printf(0, LCD_SEG_L1_3_2, "%02u", it_family);
++    _printf(0, LCD_SEG_L1_1_0, "%02u", it_device);
++#ifdef CONFIG_MOD_INTERTECHNO_PW
++    _printf(0, LCD_SEG_L2_1_0, "%02x", it_pwr[it_pwr_level]);
++#endif
++    display_symbol(0, LCD_SEG_L1_DP1, SEG_ON);
++}
++
++static void intertechno_deactivated()
++{
++    sys_messagebus_unregister(&it_tx_end);
++    display_clear(0, 1);
++}
++
++static void intertechno_up_pressed()
++{
++    it_tx_cmd(((it_family - 1) << 4) + it_device - 1, INTERTECHNO_CMD_ON);
++    display_chars(0, LCD_SEG_L2_2_0, "ON ", SEG_SET);
++}
++
++static void intertechno_down_pressed()
++{
++    it_tx_cmd(((it_family - 1) << 4) + it_device - 1, INTERTECHNO_CMD_OFF);
++    display_chars(0, LCD_SEG_L2_2_0, "OFF", SEG_SET);
++}
++
++static void intertechno_num_pressed()
++{
++    it_tx_cmd(((it_family - 1) << 4) + it_device - 1, INTERTECHNO_CMD_SP);
++    display_chars(0, LCD_SEG_L2_2_0, "SPE", SEG_SET);
++}
++
++/*************************** edit mode callbacks **************************/
++static void it_edit_ff_sel(void)
++{
++    display_chars(0, LCD_SEG_L1_3_2, NULL, BLINK_ON);
++}
++
++static void it_edit_ff_dsel(void)
++{
++    display_chars(0, LCD_SEG_L1_3_2, NULL, BLINK_OFF);
++}
++
++static void it_edit_ff_set(int8_t step)
++{
++    helpers_loop(&it_tmp_family, 1, 16, step);
++    _printf(0, LCD_SEG_L1_3_2, "%02u", it_tmp_family);
++}
++
++static void it_edit_dd_sel(void)
++{
++    display_chars(0, LCD_SEG_L1_1_0, NULL, BLINK_ON);
++}
++
++static void it_edit_dd_dsel(void)
++{
++    display_chars(0, LCD_SEG_L1_1_0, NULL, BLINK_OFF);
++}
++
++static void it_edit_dd_set(int8_t step)
++{
++    helpers_loop(&it_tmp_device, 1, 16, step);
++    _printf(0, LCD_SEG_L1_1_0, "%02u", it_tmp_device);
++}
++
++#ifdef CONFIG_MOD_INTERTECHNO_PW
++static void it_edit_pwr_sel(void)
++{
++    _printf(0, LCD_SEG_L2_2_0, " %02x", it_pwr[it_pwr_level]);
++    display_chars(0, LCD_SEG_L2_1_0, NULL, BLINK_ON);
++}
++
++static void it_edit_pwr_dsel(void)
++{
++    display_chars(0, LCD_SEG_L2_1_0, NULL, BLINK_OFF);
++}
++
++static void it_edit_pwr_set(int8_t step)
++{
++    helpers_loop(&it_tmp_pwr_level, 0, 3, step);
++    _printf(0, LCD_SEG_L2_1_0, "%02x", it_pwr[it_tmp_pwr_level]);
++}
++#endif
++
++static void intertechno_save(void)
++{
++    it_family = it_tmp_family;
++    it_device = it_tmp_device;
++#ifdef CONFIG_MOD_INTERTECHNO_PW
++    it_pwr_level = it_tmp_pwr_level;
++#endif
++}
++
++/* edit mode item table */
++static struct menu_editmode_item intertechno_items[] = {
++    {&it_edit_dd_sel, &it_edit_dd_dsel, &it_edit_dd_set},
++    {&it_edit_ff_sel, &it_edit_ff_dsel, &it_edit_ff_set},
++#ifdef CONFIG_MOD_INTERTECHNO_PW
++    {&it_edit_pwr_sel, &it_edit_pwr_dsel, &it_edit_pwr_set},
++#endif
++    {NULL}
++};
++
++static void intertechno_star_long_pressed()
++{
++    menu_editmode_start(&intertechno_save, intertechno_items);
++}
++
++void mod_intertechno_init()
++{
++    menu_add_entry("INTER",
++                   &intertechno_up_pressed,
++                   &intertechno_down_pressed,
++                   &intertechno_num_pressed,
++                   &intertechno_star_long_pressed,
++                   NULL, NULL,
++                   &intertechno_activated, &intertechno_deactivated);
++}
++
++void it_rf_init(void)
++{
++    // logic 0 and logic 1 power levels for OOK modulation
++#ifdef CONFIG_MOD_INTERTECHNO_PW
++    uint8_t PATable[2] = { 0x00, it_pwr[it_pwr_level] };
++#else
++    uint8_t PATable[2] = { 0x00, INTERTECHNO_RF_POWER };
++#endif
++
++    ResetRadioCore();
++
++    // minimal register changes
++    WriteSingleReg(IOCFG0, 0x06);       //GDO0 Output Configuration
++    WriteSingleReg(PKTLEN, INTERTECHNO_SEQ_SIZE*4);       //Packet Length
++    WriteSingleReg(PKTCTRL0, 0x00);     //Packet Automation Control
++    WriteSingleReg(FREQ2, 0x10);        //Frequency Control Word, High Byte
++    WriteSingleReg(FREQ1, 0xB0);        //Frequency Control Word, Middle Byte
++    WriteSingleReg(FREQ0, 0x71);        //Frequency Control Word, Low Byte
++    WriteSingleReg(MDMCFG4, 0x86);      //Modem Configuration
++    WriteSingleReg(MDMCFG3, 0x70);      //Modem Configuration
++    WriteSingleReg(MDMCFG2, 0x30);      //Modem Configuration
++    WriteSingleReg(MDMCFG1, 0x02);      //Modem Configuration
++    WriteSingleReg(MCSM1, 0x00);        //Main Radio Control State Machine Configuration
++    WriteSingleReg(MCSM0, 0x00);        //Main Radio Control State Machine Configuration
++    WriteSingleReg(FOCCFG, 0x76);       //Frequency Offset Compensation Configuration
++    WriteSingleReg(WOREVT1, 0x87);      //High Byte Event0 Timeout
++    WriteSingleReg(WOREVT0, 0x6B);      //Low Byte Event0 Timeout
++    WriteSingleReg(WORCTRL, 0xF8);      //Wake On Radio Control
++    WriteSingleReg(FREND0, 0x11);       //Front End TX Configuration
++    WriteSingleReg(TEST0, 0x09);        //Various Test Settings
++
++    WriteBurstPATable(&PATable[0], 2);
++}
++
++uint8_t rotate_byte(uint8_t in)
++{
++    uint8_t rv = 0;
++    rv += (in & 0x10) << 3;
++    rv += (in & 0x20) << 1;
++    rv += (in & 0x40) >> 1;
++    rv += (in & 0x80) >> 3;
++    rv += (in & 0x1) << 3;
++    rv += (in & 0x2) << 1;
++    rv += (in & 0x4) >> 1;
++    rv += (in & 0x8) >> 3;
++    return rv;
++}
++
++void it_tx_cmd(uint8_t prefix, uint8_t cmd)
++{
++    uint8_t p = 0;
++    uint8_t rprefix;
++    uint8_t it_buff[INTERTECHNO_SEQ_SIZE];
++    int8_t i;
++
++    rprefix = rotate_byte(prefix);
++
++    // replace 1 with 0x8e and 0 with 0x88
++    for (i = 7; i >= 0; i--) {
++        if (rprefix & (1 << i)) {
++            it_buff[p] = 0x8e;
++        } else {
++            it_buff[p] = 0x88;
++        }
++        p++;
++    }
++
++    for (i = 3; i >= 0; i--) {
++        if (cmd & (1 << i)) {
++            it_buff[p] = 0x8e;
++        } else {
++            it_buff[p] = 0x88;
++        }
++        p++;
++    }
++
++    // sync sequence
++    it_buff[p++] = 0x80;
++    it_buff[p++] = 0;
++    it_buff[p++] = 0;
++    it_buff[p] = 0;
++
++    // display RF symbol
++    display_symbol(0, LCD_ICON_BEEPER1, SEG_ON);
++    display_symbol(0, LCD_ICON_BEEPER2, SEG_ON);
++    display_symbol(0, LCD_ICON_BEEPER3, SEG_ON);
++
++    it_rf_init();
++
++    Strobe(RF_SCAL);            // re-calibrate radio
++
++    // set an interrupt to trigger when the packet is fully sent
++    RF1AIES |= BIT9;
++    RF1AIFG &= ~BIT9;           // Clear pending interrupts
++    RF1AIE |= BIT9;             // Enable TX end-of-packet interrupt
++
++    // factory remotes send the command sequence 4 times
++    for (i = 0; i < 4; i++) {
++        WriteBurstReg(RF_TXFIFOWR, it_buff, INTERTECHNO_SEQ_SIZE);
++    }
++    Strobe(RF_STX);             // transmit
++
++}
++
++static void it_tx_end(enum sys_message msg)
++{
++    Strobe(RF_SIDLE);           // IDLE
++    Strobe(RF_SFTX);            // flush TXFIFO
++    Strobe(RF_SPWD);            // power-down mode
++
++    // clear RF symbol
++    display_symbol(0, LCD_ICON_BEEPER1, SEG_OFF);
++    display_symbol(0, LCD_ICON_BEEPER2, SEG_OFF);
++    display_symbol(0, LCD_ICON_BEEPER3, SEG_OFF);
++}
+diff -urpEbBN '--exclude=.git' '--exclude-from=.diffexclude' '--exclude-from=.gitignore' ../openchronos-ng-code/modules/intertechno.cfg ./modules/intertechno.cfg
+--- ../openchronos-ng-code/modules/intertechno.cfg	1970-01-01 02:00:00.000000000 +0200
++++ ./modules/intertechno.cfg	2012-11-18 17:46:14.000000000 +0200
+@@ -0,0 +1,9 @@
++[INTERTECHNO]
++name = Intertechno
++default = false
++help = control intertechno radio switches (needs 433MHz watch)
++
++[INTERTECHNO_PW]
++name = selectable power levels
++default = false
++help = additional menu option that enables selection of output power level (+122bytes)
+diff -urpEbBN '--exclude=.git' '--exclude-from=.diffexclude' '--exclude-from=.gitignore' ../openchronos-ng-code/modules/music.c ./modules/music.c
+--- ../openchronos-ng-code/modules/music.c	2013-03-23 20:45:34.001563086 +0200
++++ ./modules/music.c	2013-03-11 22:17:03.000000000 +0200
+@@ -27,7 +27,7 @@
+ 
+ /* tunes generated using contrib/rtttl2bin.py */
+ /* super mario bros tune */
+-static note smb[] = {0x2588, 0x4b08, 0x4b08, 0x258c, 0x4b08, 0x4b0b, 0x4b04, 0x4b04, 0x4b04, 0x3204, 0x258f, 0x4b04, 0x4b0c, 0x2584, 0x4b05, 0x4b07, 0x2586, 0x2585, 0x2584, 0x258f, 0x4b08, 0x258b, 0x4b09, 0x2588, 0x4b0b, 0x4b08, 0x258c, 0x2588, 0x3207, 0x3204, 0x258f, 0x4b04, 0x4b0c, 0x2584, 0x4b05, 0x4b07, 0x2586, 0x2585, 0x2584, 0x258f, 0x4b08, 0x258b, 0x4b09, 0x2588, 0x4b0b, 0x4b08, 0x000F};
++static note smb[] = {0x2588, 0x4b08, 0x4b08, 0x258c, 0x4b08, 0x4b0b, 0x4b04, 0x4b04, 0x4b04, 0x3204, 0x258f, 0x4b04, 0x4b0c, 0x2584, 0x4b05, 0x4b07, 0x2586, 0x2585, 0x2584, 0x258f, 0x4b08, 0x258b, 0x4b09, 0x2588, 0x4b0b, 0x4b08, 0x258c, 0x2588, 0x3207, 0x3204, 0x258f, 0x4b04, 0x4b0c, 0x2584, 0x4b05, 0x4b07, 0x2586, 0x2585, 0x2584, 0x258f, 0x4b08, 0x258b, 0x4b09, 0x2588, 0x4b0b, 0x4b08, 0x0000};
+ 
+ static void num_press()
+ {
+diff -urpEbBN '--exclude=.git' '--exclude-from=.diffexclude' '--exclude-from=.gitignore' ../openchronos-ng-code/modules/reset.c ./modules/reset.c
+--- ../openchronos-ng-code/modules/reset.c	2013-03-11 22:52:56.607922367 +0200
++++ ./modules/reset.c	2013-03-12 00:05:34.000000000 +0200
+@@ -23,7 +23,7 @@
+ 
+ #include <drivers/display.h>
+ 
+-static void num_press()
++static void updown_press()
+ {
+ 	/* reset microcontroller */
+ 	WDTCTL = 0;
+@@ -43,7 +43,8 @@ static void reset_deactivate()
+ 
+ void mod_reset_init(void)
+ {
+-	menu_add_entry("RESET", NULL, NULL, &num_press, NULL, NULL, NULL,
++	menu_add_entry("RESET", NULL, NULL, NULL, NULL, NULL, 
++                        &updown_press,
+ 						&reset_activate,
+ 						&reset_deactivate);
+ }
+diff -urpEbBN '--exclude=.git' '--exclude-from=.diffexclude' '--exclude-from=.gitignore' ../openchronos-ng-code/openchronos.c ./openchronos.c
+--- ../openchronos-ng-code/openchronos.c	2013-03-23 20:45:34.001563086 +0200
++++ ./openchronos.c	2013-03-23 20:54:18.047458414 +0200
+@@ -110,6 +110,12 @@ static struct {
+ 	struct menu *item;      /* the currently active menu item */
+ } menumode;
+ 
++/* systemtime when the menu mode will be canceled */
++uint32_t autocancel_time;
++struct menu *menu_last;
++#define MENU_AUTOCANCEL_DELAY 5
++#define EDIT_AUTOCANCEL_DELAY 15
++
+ /* Menu edit mode stuff */
+ static struct {
+ 	uint8_t enabled:1;          /* is edit mode enabled? */
+@@ -188,6 +194,12 @@ void check_events(void)
+ 	}
+ #endif
+ 
++	/* drivers/radio */
++    if(radio_last_event){
++        msg |= SYS_MSG_RADIO;
++        radio_last_event = 0;
++    }
++
+ 	{
+ 		struct sys_messagebus *p = messagebus;
+ 
+@@ -226,7 +238,7 @@ static void editmode_handler(void)
+ {
+ 
+ 	/* STAR button exits edit mode */
+-	if (BTN_PRESSED(BTN_STAR)) {
++	if (BTN_PRESSED(BTN_STAR) || (rtca_time.sys >= autocancel_time)) {
+ 		/* deselect item */
+ 		menu_editmode.items[menu_editmode.pos].deselect();
+ 
+@@ -234,6 +246,7 @@ static void editmode_handler(void)
+ 		menu_editmode.enabled = 0;
+ 
+ 	} else if (BTN_PRESSED(BTN_NUM)) {
++		autocancel_time = rtca_time.sys + EDIT_AUTOCANCEL_DELAY;
+ 		/* deselect current item */
+ 		menu_editmode.items[menu_editmode.pos].deselect();
+ 
+@@ -245,15 +258,14 @@ static void editmode_handler(void)
+ 
+ 	} else if (BTN_PRESSED(BTN_UP) || (BTN_ONHOLD(BTN_UP)
+ 			&& timer0_20hz_counter - btns_last_press > 3)) {
++		autocancel_time = rtca_time.sys + EDIT_AUTOCANCEL_DELAY;
+ 		menu_editmode.items[menu_editmode.pos].set(1);
+-		
+ 		/* we need this here for the BTN_ONHOLD case */
+ 		btns_last_press = timer0_20hz_counter;
+-
+ 	} else if (BTN_PRESSED(BTN_DOWN) || (BTN_ONHOLD(BTN_DOWN)
+ 			&& timer0_20hz_counter - btns_last_press > 3)) {
++		autocancel_time = rtca_time.sys + EDIT_AUTOCANCEL_DELAY;
+ 		menu_editmode.items[menu_editmode.pos].set(-1);
+-		
+ 		/* we need this here for the BTN_ONHOLD case */
+ 		btns_last_press = timer0_20hz_counter;
+ 	}
+@@ -261,7 +273,7 @@ static void editmode_handler(void)
+ 
+ static void menumode_handler(void)
+ {
+-	if (BTN_PRESSED(BTN_STAR)) {
++	if (BTN_PRESSED(BTN_STAR) || (rtca_time.sys >= autocancel_time)) {
+ 		/* exit mode mode */
+ 		menumode.enabled = 0;
+ 
+@@ -276,15 +288,21 @@ static void menumode_handler(void)
+ 		/* stop blinking name of current selected module */
+ 		display_chars(0, LCD_SEG_L2_4_0, NULL, BLINK_OFF);
+ 
++		if (rtca_time.sys >= autocancel_time) {
++			menumode.item = menu_last;
++		}
++
+ 		/* activate item */
+ 		if (menumode.item->activate_fn)
+ 			menumode.item->activate_fn();
+ 
+ 	} else if (BTN_PRESSED(BTN_UP)) {
++		autocancel_time = rtca_time.sys + MENU_AUTOCANCEL_DELAY;
+ 		menumode.item = menumode.item->next;
+ 		display_chars(0, LCD_SEG_L2_4_0, menumode.item->name, SEG_SET);
+ 
+ 	} else if (BTN_PRESSED(BTN_DOWN)) {
++		autocancel_time = rtca_time.sys + MENU_AUTOCANCEL_DELAY;
+ 		menumode.item = menumode.item->prev;
+ 		display_chars(0, LCD_SEG_L2_4_0, menumode.item->name, SEG_SET);
+ 	}
+@@ -292,6 +310,9 @@ static void menumode_handler(void)
+ 
+ static void menumode_enable(void)
+ {
++	autocancel_time = rtca_time.sys + MENU_AUTOCANCEL_DELAY;
++	menu_last = menumode.item;
++
+ 	/* deactivate current menu item */
+ 	if (menumode.item->deactivate_fn)
+ 		menumode.item->deactivate_fn();
+@@ -408,6 +429,7 @@ void menu_editmode_start(void (* complet
+ 	menu_editmode.complete_fn = complete_fn;
+ 
+ 	menu_editmode.enabled = 1;
++	autocancel_time = rtca_time.sys + EDIT_AUTOCANCEL_DELAY;
+ 
+ 	/* select the first item */
+ 	menu_editmode.items[0].select();
+@@ -485,7 +507,7 @@ void init_application(void)
+ 	timer0_init();
+ 
+ 	/* Init buzzer */
+-	buzzer_init();
++	//buzzer_init();
+ 
+ 	// ---------------------------------------------------------------------
+ 	// Init pressure sensor
+@@ -526,6 +547,7 @@ int main(void)
+ 
+ 	/* main loop */
+ 	while (1) {
++		/* Go to the appropriate level of LPM and service watchdog */
+ 		/* Go to LPM3, wait for interrupts */
+ 		_BIS_SR(LPM3_bits + GIE);
+ 		__no_operation();
+diff -urpEbBN '--exclude=.git' '--exclude-from=.diffexclude' '--exclude-from=.gitignore' ../openchronos-ng-code/openchronos.h ./openchronos.h
+--- ../openchronos-ng-code/openchronos.h	2013-03-23 20:45:34.001563086 +0200
++++ ./openchronos.h	2013-03-23 08:40:21.050469757 +0200
+@@ -119,6 +119,7 @@ enum sys_message {
+ 	SYS_MSG_AS_INT =	BITA,
+ 	SYS_MSG_PS_INT =	BITB,
+ 	SYS_MSG_BATT =    BITC,
++    SYS_MSG_RADIO       = BITE,
+ };
+ 
+ /*!
+diff -urpEbBN '--exclude=.git' '--exclude-from=.diffexclude' '--exclude-from=.gitignore' ../openchronos-ng-code/tools/update_rtca_now.sh ./tools/update_rtca_now.sh
+--- ../openchronos-ng-code/tools/update_rtca_now.sh	2012-11-18 18:00:02.794269796 +0200
++++ ./tools/update_rtca_now.sh	2012-11-18 18:53:12.000000000 +0200
+@@ -14,7 +14,7 @@ cat << EOF > drivers/rtca_now.h
+ #define COMPILE_YEAR `date +%Y`
+ #define COMPILE_MON `date +%m | strip_zero`
+ #define COMPILE_DAY `date +%d | strip_zero`
+-#define COMPILE_DOW `date +%u`
++#define COMPILE_DOW `date +%u | sed 's|7|0|'`
+ #define COMPILE_HOUR `date +%H | strip_zero`
+ #define COMPILE_MIN `date +%M | strip_zero`
+ 

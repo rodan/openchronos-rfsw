@@ -15,6 +15,7 @@ BASH := $(shell which bash || which bash)
 .PHONY: httpdoc
 .PHONY: force
 .PHONY: tags
+.PHONY: diff
 
 all: new_timestamps depend config.h openchronos.txt tags
 
@@ -85,6 +86,10 @@ config.h:
 
 new_timestamps:
 	@$(BASH) ./tools/update_rtca_now.sh
+
+diff: $(SRCS)
+	@echo "Generating diff to upstream code"
+	@diff -urpEbBN --exclude=.git --exclude-from=.diffexclude --exclude-from=.gitignore ../openchronos-ng-code ./ > diff_to_upstream.patch; /bin/true
 
 tags: $(SRCS)
 	@echo "Generating tags .."
