@@ -1,7 +1,7 @@
 /*
     openchronos.c: openchronos-ng main loop & user interface
 
-	 Copyright (C) 2012 Angelo Arrifano <miknix@gmail.com>
+	 Copyright (C) 2012-2013 Angelo Arrifano <miknix@gmail.com>
 
 	          http://www.openchronos-ng.sourceforge.net
 
@@ -188,12 +188,6 @@ void check_events(void)
 		as_last_interrupt = 0;
 	}
 
-	/* drivers/buzzer */
-	if(buzzer_finished) {
-		msg |= SYS_MSG_BUZ_FINISHED;
-		buzzer_finished = 0;
-	}
-
 #ifdef CONFIG_BATTERY_MONITOR
 	/* drivers/battery */
 	if ((msg & SYS_MSG_RTC_MINUTE) == SYS_MSG_RTC_MINUTE) {
@@ -229,17 +223,31 @@ void check_events(void)
  ************************ USER INPUT / MAIN MENU ***************************
  **************************************************************************/
 
+#define BTN_DOWN	0
+#define BTN_NUM		1
+#define BTN_STAR	2
+#define BTN_BL		3
+#define BTN_UP		4
+
+#define BTN_PRESSED(B) (((ports_btns_state ^ btns_last_state) \
+					& ports_btns_state) >> (B) & 0x01)
+#define BTN_ONHOLD(B) ((ports_btns_state)>>(B) & 0x01)
+
+static uint8_t btns_last_state;
+
 static void editmode_handler(void)
 {
+    static uint16_t last_btn_press;
+
 	/* STAR button exits edit mode */
-	if (ports_button_isPressed(PORTS_BTN_STAR, 0) || (rtca_time.sys >= autocancel_time)) {
+	if (BTN_PRESSED(BTN_STAR) || (rtca_time.sys >= autocancel_time)) {
 		/* deselect item */
 		menu_editmode.items[menu_editmode.pos].deselect();
 
 		menu_editmode.complete_fn();
 		menu_editmode.enabled = 0;
 
-	} else if (ports_button_isPressed(PORTS_BTN_NUM, 0)) {
+	} else if (BTN_PRESSED(BTN_NUM)) {
 		autocancel_time = rtca_time.sys + EDIT_AUTOCANCEL_DELAY;
 		/* deselect current item */
 		menu_editmode.items[menu_editmode.pos].deselect();
@@ -250,19 +258,23 @@ static void editmode_handler(void)
 			menu_editmode.pos = 0;
 		menu_editmode.items[menu_editmode.pos].select();
 
-	} else if (ports_button_isPressed(PORTS_BTN_UP, 0)) {
+	} else if (BTN_PRESSED(BTN_UP) || (BTN_ONHOLD(BTN_UP)
+			&& timer0_20hz_counter - last_btn_press > 3)) {
 		autocancel_time = rtca_time.sys + EDIT_AUTOCANCEL_DELAY;
 		menu_editmode.items[menu_editmode.pos].set(1);
+        last_btn_press = timer0_20hz_counter;
 
-	} else if (ports_button_isPressed(PORTS_BTN_DOWN, 0)) {
+	} else if (BTN_PRESSED(BTN_DOWN) || (BTN_ONHOLD(BTN_DOWN)
+			&& timer0_20hz_counter - last_btn_press > 3)) {
 		autocancel_time = rtca_time.sys + EDIT_AUTOCANCEL_DELAY;
 		menu_editmode.items[menu_editmode.pos].set(-1);
+        last_btn_press = timer0_20hz_counter;
 	}
 }
 
 static void menumode_handler(void)
 {
-	if (ports_button_isPressed(PORTS_BTN_STAR, 0) || (rtca_time.sys >= autocancel_time)) {
+	if (BTN_PRESSED(BTN_STAR) || (rtca_time.sys >= autocancel_time)) {
 		/* exit mode mode */
 		menumode.enabled = 0;
 
@@ -285,12 +297,12 @@ static void menumode_handler(void)
 		if (menumode.item->activate_fn)
 			menumode.item->activate_fn();
 
-	} else if (ports_button_isPressed(PORTS_BTN_UP, 0)) {
+	} else if (BTN_PRESSED(BTN_UP)) {
 		autocancel_time = rtca_time.sys + MENU_AUTOCANCEL_DELAY;
 		menumode.item = menumode.item->next;
 		display_chars(0, LCD_SEG_L2_4_0, menumode.item->name, SEG_SET);
 
-	} else if (ports_button_isPressed(PORTS_BTN_DOWN, 0)) {
+	} else if (BTN_PRESSED(BTN_DOWN)) {
 		autocancel_time = rtca_time.sys + MENU_AUTOCANCEL_DELAY;
 		menumode.item = menumode.item->prev;
 		display_chars(0, LCD_SEG_L2_4_0, menumode.item->name, SEG_SET);
@@ -321,45 +333,48 @@ static void menumode_enable(void)
 	display_chars(0, LCD_SEG_L2_4_0, menumode.item->name, SEG_SET);
 }
 
-static void check_buttons(void)
+static void drive_menu(void)
 {
 	if (menu_editmode.enabled) {
 		editmode_handler();
-
-	} else if (menumode.enabled) {
-		menumode_handler();
-
-	} else {
-		if (ports_button_isPressed(PORTS_BTN_LSTAR, 1)) {
-			if (menumode.item->lstar_btn_fn)
-				menumode.item->lstar_btn_fn();
-
-		} else if (ports_button_isPressed(PORTS_BTN_STAR, !!(menumode.item->lstar_btn_fn))) {
-			menumode_enable();
-
-		} else if (ports_button_isPressed(PORTS_BTN_LNUM, 1)) {
-			if (menumode.item->lnum_btn_fn)
-				menumode.item->lnum_btn_fn();
-
-		} else if (ports_button_isPressed(PORTS_BTN_NUM, !!(menumode.item->lnum_btn_fn))) {
-			if (menumode.item->num_btn_fn)
-				menumode.item->num_btn_fn();
-
-		} else if (ports_button_isPressed(PORTS_BTN_UP | PORTS_BTN_DOWN, 0)) {
-			if (menumode.item->updown_btn_fn)
-				menumode.item->updown_btn_fn();
-
-		} else if (ports_button_isPressed(PORTS_BTN_UP, 0)) {
-			if (menumode.item->up_btn_fn)
-				menumode.item->up_btn_fn();
-
-		} else if (ports_button_isPressed(PORTS_BTN_DOWN, 0)) {
-			if (menumode.item->down_btn_fn)
-				menumode.item->down_btn_fn();
-		}
+		goto finish;
 	}
 
-    ports_buttons_clear();
+	if (menumode.enabled) {
+		menumode_handler();
+		goto finish;
+	}
+
+	if (BTN_ONHOLD(BTN_STAR) && BTN_ONHOLD(BTN_UP)) {
+		if (menumode.item->lstar_btn_fn)
+			menumode.item->lstar_btn_fn();
+
+	} else if (BTN_PRESSED(BTN_STAR)) {
+		menumode_enable();
+
+	} else if (BTN_ONHOLD(BTN_NUM) && BTN_ONHOLD(BTN_DOWN)) {
+		if (menumode.item->lnum_btn_fn)
+			menumode.item->lnum_btn_fn();
+
+	} else if (BTN_PRESSED(BTN_NUM)) {
+		if (menumode.item->num_btn_fn)
+			menumode.item->num_btn_fn();
+
+	} else if (BTN_ONHOLD(BTN_UP) && BTN_ONHOLD(BTN_DOWN)) {
+		if (menumode.item->updown_btn_fn)
+			menumode.item->updown_btn_fn();
+
+	} else if (BTN_PRESSED(BTN_UP)) {
+		if (menumode.item->up_btn_fn)
+			menumode.item->up_btn_fn();
+
+	} else if (BTN_PRESSED(BTN_DOWN)) {
+		if (menumode.item->down_btn_fn)
+			menumode.item->down_btn_fn();
+	}
+
+finish:
+	btns_last_state = ports_btns_state;
 }
 
 void menu_add_entry(char const * name,
@@ -485,11 +500,8 @@ void init_application(void)
 	as_disconnect();
 #endif
 
-	// ---------------------------------------------------------------------
-	// Init buttons
 	init_buttons();
 
-	// ---------------------------------------------------------------------
 	// Configure Timer0 for use by the clock and delay functions
 	timer0_init();
 
@@ -510,22 +522,6 @@ void init_application(void)
 	if (infomem_ready() == -2) {
 		infomem_init(INFOMEM_C, INFOMEM_C + 2 * INFOMEM_SEGMENT_SIZE);
 	}
-#endif
-}
-
-inline void sleep_and_service_wd()
-{
-	/* Go to appropriate LPM, wait for interrupts */
-	if(BUZZER_PLAYING)
-		_BIS_SR(LPM1_bits + GIE);
-	else
-		_BIS_SR(LPM3_bits + GIE);
-	__no_operation();
-
-	/* service watchdog on wakeup */
-#ifdef USE_WATCHDOG
-	// Service watchdog (reset counter)
-	WDTCTL = (WDTCTL & 0xff) | WDTPW | WDTCNTCL;
 #endif
 }
 
@@ -551,13 +547,21 @@ int main(void)
 	/* main loop */
 	while (1) {
 		/* Go to the appropriate level of LPM and service watchdog */
-		sleep_and_service_wd();
+		/* Go to LPM3, wait for interrupts */
+		_BIS_SR(LPM3_bits + GIE);
+		__no_operation();
+
+		/* service watchdog on wakeup */
+		#ifdef USE_WATCHDOG
+			// Service watchdog (reset counter)
+			WDTCTL = (WDTCTL & 0xff) | WDTPW | WDTCNTCL;
+		#endif
 
 		/* check if any driver has events pending */
 		check_events();
 
-		/* check for button presses, drive the menu */
-		check_buttons();
+		/* drive menu */
+		drive_menu();
 	}
 }
 
