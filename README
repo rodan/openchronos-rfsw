@@ -5,7 +5,7 @@ C code that can run on an Texas Instruments EZ430-Chronos 433MHz watch [1] with 
  forked from:     http://openchronos-ng.sourceforge.net
 
  new module:      https://github.com/rodan/openchronos-rfsw
- author:          Petre Rodan <petre.rodan@simplex.ro>
+ author:          Petre Rodan <2b4eda@subdimension.ro>
  license:         GNU GPLv3
 
  Based on a nice tutorial by Christian M. Schmid

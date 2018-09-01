@@ -1,7 +1,7 @@
 //
 // code used to control Intertechno radio switches
 //
-// Author:          Petre Rodan <petre.rodan@simplex.ro>
+// Author:          Petre Rodan <2b4eda@subdimension.ro>
 // Available from:  https://github.com/rodan/openchronos-rfsw
 // License:         GNU GPLv3
 //

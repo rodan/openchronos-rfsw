@@ -95,7 +95,7 @@ diff -urpEbBN '--exclude=.git' '--exclude-from=.diffexclude' '--exclude-from=.gi
 + forked from:     http://openchronos-ng.sourceforge.net
 +
 + new module:      https://github.com/rodan/openchronos-rfsw
-+ author:          Petre Rodan <petre.rodan@simplex.ro>
++ author:          Petre Rodan <2b4eda@subdimension.ro>
 + license:         GNU GPLv3
 +
 + Based on a nice tutorial by Christian M. Schmid
@@ -416,7 +416,7 @@ diff -urpEbBN '--exclude=.git' '--exclude-from=.diffexclude' '--exclude-from=.gi
 +//
 +// code used to control Intertechno radio switches
 +//
-+// Author:          Petre Rodan <petre.rodan@simplex.ro>
++// Author:          Petre Rodan <2b4eda@subdimension.ro>
 +// Available from:  https://github.com/rodan/openchronos-rfsw
 +// License:         GNU GPLv3
 +//
